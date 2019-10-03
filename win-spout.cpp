@@ -37,9 +37,8 @@ OBS_MODULE_USE_DEFAULT_LOCALE("win-spout", "en-US")
 	blog(LOG_WARNING, "[%s] " message, \
 	     obs_source_get_name(context->source), ##__VA_ARGS__)
 
-#define CUSTOM_SPOUT_NAME "customspoutname"
-#define USE_FIRST_AVAILABLE_SENDER "usefirstavailablesender"
 #define SPOUT_SENDER_LIST "spoutsenders"
+#define USE_FIRST_AVAILABLE_SENDER "usefirstavailablesender"
 
 struct win_spout {
 	obs_source_t *source;
@@ -161,16 +160,17 @@ static void win_spout_update(void *data, obs_data_t *settings)
 {
 	struct win_spout *context = (win_spout *)data;
 
-	context->useFirstSender =
-		obs_data_get_bool(settings, USE_FIRST_AVAILABLE_SENDER);
+	auto selectedSender = obs_data_get_string(settings, SPOUT_SENDER_LIST);
 
-	const char *newName;
-
-	newName = obs_data_get_string(settings, CUSTOM_SPOUT_NAME);
-
-	// ensure we completely clear it
-	memset(context->senderName, 0, 256);
-	strcpy(context->senderName, newName);
+	if (strcmp(selectedSender, USE_FIRST_AVAILABLE_SENDER) == 0)
+	{
+		context->useFirstSender = true;
+	} else {
+		context->useFirstSender = false;
+		memset(context->senderName, 0, 256);
+		strcpy(context->senderName, selectedSender);
+	}
+	
 
 	if (context->initialized) {
 		win_spout_deinit(data);
@@ -180,8 +180,7 @@ static void win_spout_update(void *data, obs_data_t *settings)
 
 static void win_spout_defaults(obs_data_t *settings)
 {
-	obs_data_set_default_string(settings, CUSTOM_SPOUT_NAME, "");
-	obs_data_set_default_bool(settings, USE_FIRST_AVAILABLE_SENDER, true);
+	UNUSED_PARAMETER(settings);
 }
 
 static uint32_t win_spout_getwidth(void *data)
@@ -286,52 +285,25 @@ static void win_spout_render(void *data, gs_effect_t *effect)
 	}
 }
 
-static bool on_toggle_first_available(obs_properties_t *props,
-				      obs_property_t *p, obs_data_t *s)
-{
-	UNUSED_PARAMETER(props);
-	UNUSED_PARAMETER(p);
-	if (!obs_data_get_bool(s, USE_FIRST_AVAILABLE_SENDER)) {
-		// clear the name
-		obs_data_set_string(s, CUSTOM_SPOUT_NAME, "");
-	}
-	return true;
-}
-
 static void fill_senders(SPOUTHANDLE spoutptr, obs_property_t *list)
 {
 	// clear the list first
 	obs_property_list_clear(list);
 
+	// first option in the list should be "Take whatever is available"
+	obs_property_list_add_string(list, obs_module_text("Use First Available Sender"), USE_FIRST_AVAILABLE_SENDER);
 	int totalSenders = spoutptr->GetSenderCount();
 	if (totalSenders == 0) {
 		return ;
 	}
 	int index;
 	char senderName[256];
+	// then get the name of each sender from SPOUT
 	for (index = 0; index < totalSenders; index++)
 	{
 		spoutptr->GetSenderName(index, senderName);
 		obs_property_list_add_string(list, senderName, senderName);
 	}
-}
-
-static bool on_sender_list_selected(obs_properties_t *props,
-	obs_property_t *list,
-	obs_data_t *settings)
-{
-	UNUSED_PARAMETER(props);
-	UNUSED_PARAMETER(list);
-	const char *selectedSender =
-		obs_data_get_string(settings, SPOUT_SENDER_LIST);
-	if (strlen(selectedSender) == 0)
-	{
-		return true;
-	}
-
-	obs_data_set_string(settings, CUSTOM_SPOUT_NAME, selectedSender);
-	obs_data_set_bool(settings, USE_FIRST_AVAILABLE_SENDER, false);
-	return true;
 }
 
 // initialise the gui fields
@@ -341,18 +313,8 @@ static obs_properties_t *win_spout_properties(void *data)
 
 	obs_properties_t *props = obs_properties_create();
 
-	obs_property_t *p = obs_properties_add_bool(
-		props, USE_FIRST_AVAILABLE_SENDER,
-		obs_module_text("UseFirstAvailableSender"));
-	obs_property_set_modified_callback(p, on_toggle_first_available);
-
-	obs_properties_add_text(props, CUSTOM_SPOUT_NAME,
-				obs_module_text("CustomSpoutName"),
-				OBS_TEXT_DEFAULT);
-
 	obs_property_t *list = obs_properties_add_list(props, SPOUT_SENDER_LIST,
 				obs_module_text("SpoutSenders"),OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
-	obs_property_set_modified_callback(p, on_sender_list_selected);
 
 	fill_senders(context->spoutptr, list);
 
