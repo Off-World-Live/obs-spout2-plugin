@@ -83,6 +83,59 @@ static bool get_first_spount_sender(SPOUTHANDLE spoutptr, char *sender_name)
 	return true;
 }
 
+/**
+ * Updates sender texture details on the context
+ * @return bool success
+ */
+static bool win_spout_get_sender_info(win_spout * context)
+{
+	unsigned int width, height;
+	// get info about this active sender:
+	if (!context->spoutptr->GetSenderInfo(context->senderName, width,
+					      height, context->dxHandle,
+					      context->dxFormat)) {
+		warn("Named sender not found w: %d, h: %d", width, height);
+		return false;
+	}
+
+	info("Sender %s is of dimensions %d x %d", context->senderName, width,
+	     height);
+
+	context->width = width;
+	context->height = height;
+	return true;
+}
+
+/**
+ * Updates sender texture details on the context
+ * and works out whether any of this data has changed
+ *
+ * @return bool sender data has changed
+ */
+static bool win_spout_sender_has_changed(win_spout * context)
+{
+	DWORD oldFormat = context->dxFormat;
+	auto oldWidth = context->width;
+	auto oldHeight = context->height;
+
+	if (!win_spout_get_sender_info(context)) {
+		// assume that if it fails, it has changed
+		// ie sender no longer exists
+		return true;
+	}
+	if (
+		context->width != oldWidth ||
+		context->height != oldHeight ||
+		oldFormat != context->dxFormat
+		)
+	{
+		return true;
+	}
+	return false;
+}
+
+
+
 static void win_spout_init(void *data, bool forced = false)
 {
 	struct win_spout *context = (win_spout *)data;
@@ -112,21 +165,7 @@ static void win_spout_init(void *data, bool forced = false)
 	}
 
 	info("Getting info for sender %s", context->senderName);
-
-	unsigned int width, height;
-	// get info about this active sender:
-	if (!context->spoutptr->GetSenderInfo(context->senderName, width,
-					      height, context->dxHandle,
-					      context->dxFormat)) {
-		warn("Named sender not found w: %d, h: %d", width, height);
-		return;
-	}
-
-	info("Sender %s is of dimensions %d x %d", context->senderName, width,
-	     height);
-
-	context->width = width;
-	context->height = height;
+	win_spout_get_sender_info(context);
 
 	obs_enter_graphics();
 	gs_texture_destroy(context->texture);
@@ -237,6 +276,14 @@ static void win_spout_tick(void *data, float seconds)
 	struct win_spout *context = (win_spout *)data;
 
 	context->active = obs_source_active(context->source);
+	if (win_spout_sender_has_changed(context)) {
+		info("Sender %s has changed / gone away. Resetting ",
+		     context->senderName);
+		context->initialized = false;
+		win_spout_deinit(data);
+		win_spout_init(data);
+		return;
+	}
 	if (!context->initialized) {
 		win_spout_init(data);
 	}
