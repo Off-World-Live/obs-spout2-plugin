@@ -27,10 +27,16 @@ Thanks to the authors of [SPOUT](https://github.com/leadedge/Spout2) for the lib
 
 **N.B. For now I have only released a x64 build**
 
-- Download the latest release build zip file (_not SourceCode.zip_)
-- Extract to your OBS Directory (usually `C:\Program Files (x86)\obs-studio`)
-- check that `win-spout.dll` and `SpoutLibrary.dll` are in the `obs-plugins` folder
-- Run OBS
+- Go to the [Releases Page](https://github.com/Off-World-Live/obs-spout2-source-plugin/releases)
+- Download the windows installer: `OBS_Spout2_Plugin_Installer.exe`
+- Run the installer (accepting installation from untrusted source)
+- Select the `OBS` directory if not the default install location
+
+### Manual Installation
+
+- If you are unable to run the installer, download the release zip file `OBS_SPOUT2_Plugin_Build_xxx.zip`
+- Extract the entire contents into your OBS directory
+- Verify that `win-spout.dll` is in the dir `<obs-install>\obs-plugins\64bit`
 
 ## Contributing / Building
 
@@ -40,6 +46,12 @@ Thanks to the authors of [SPOUT](https://github.com/leadedge/Spout2) for the lib
 - Download the latest [Spout Source](https://github.com/leadedge/Spout2/releases) and extract the contents of [this folder](https://github.com/leadedge/Spout2/tree/master/SpoutSDK/Source/SPOUT_LIBRARY) into a new folder `/deps/spout` inside the OBS Source code directory
 - After building, be sure to copy [Spout.dll](https://github.com/leadedge/Spout2/blob/master/SpoutSDK/Source/SPOUT_LIBRARY/Binaries/x64/SpoutLibrary.dll) to your the `obs-plugins` directory inside your `build/runtime/Debug` folder. (I haven't worked out how to get CMake to do this automatically - suggestions / PRS welcome.
 - So far I have only built this in 64bit but I see no reason why it should not work with 32bit builds.
+
+### Building the windows installer
+
+- Download the latest version of [NSIS here](https://nsis.sourceforge.io/Download);
+- Set the the `APPVERSION` variable in `win-spout-installer.nsi`
+- Compile [win-spout-installer.nsi](./win-spout-installer.nsi)
 
 Pull Requests welcome!
 
