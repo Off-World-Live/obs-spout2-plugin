@@ -61,6 +61,11 @@ struct win_spout {
 
 	bool initialized;
 	bool active;
+
+	int spout_status;
+	int render_status;
+	int tick_status;
+	bool need_release;
 };
 // gets the first spout sender available -- assumes that sender name
 // is maximum size 256 (default for spout SDK)
@@ -88,6 +93,25 @@ static bool get_first_spount_sender(SPOUTHANDLE spoutptr, char *sender_name)
  * @return bool success
  */
 static bool win_spout_get_sender_info(win_spout * context)
+{
+	unsigned int width, height;
+	// get info about this active sender:
+	if (!context->spoutptr->GetSenderInfo(context->senderName, width,
+					      height, context->dxHandle,
+					      context->dxFormat)) {
+		return false;
+	}
+
+	context->width = width;
+	context->height = height;
+	return true;
+}
+
+/**
+ * Updates and Log sender texture details on the context
+ * @return bool success
+ */
+static bool win_spout_log_sender_info(win_spout *context)
 {
 	unsigned int width, height;
 	// get info about this active sender:
@@ -139,36 +163,50 @@ static bool win_spout_sender_has_changed(win_spout * context)
 static void win_spout_init(void *data, bool forced = false)
 {
 	struct win_spout *context = (win_spout *)data;
-	if (context->initialized)
+	if (context->initialized) {
+		context->spout_status = 0;
 		return;
+	}
+		
 
 	if (GetTickCount() - 5000 < context->lastCheckTick && !forced) {
 		return;
 	}
 
 	if (context->spoutptr == NULL) {
-		warn("Spout pointer didn't exist");
+		if (context->spout_status != -1) {
+			warn("Spout pointer didn't exist");
+			context->spout_status = -1;
+		}
 		return;
 	}
 
 	if (context->useFirstSender) {
 		if (!get_first_spount_sender(context->spoutptr,
 					     context->senderName)) {
-			info("No active Spout cameras");
+			if (context->spout_status != -2) {
+				info("No active Spout cameras");
+				context->spout_status = -2;
+			}
+
 			return;
 		}
 	} else {
 		if (context->spoutptr->GetSenderCount() == 0) {
-			info("No Spout senders active");
+			if (context->spout_status != -3) {
+				info("No Spout senders active");
+				context->spout_status = -3;
+			}
 			return;
 		}
 	}
 
 	info("Getting info for sender %s", context->senderName);
-	win_spout_get_sender_info(context);
+	win_spout_log_sender_info(context);
 
 	obs_enter_graphics();
 	gs_texture_destroy(context->texture);
+	context->need_release = true;
 	context->texture = gs_texture_open_shared((uint32_t)context->dxHandle);
 	obs_leave_graphics();
 
@@ -186,7 +224,11 @@ static void win_spout_deinit(void *data)
 		context->texture = NULL;
 	}
 	// cleanup spout
-	context->spoutptr->ReleaseReceiver();
+	if (context->need_release) {
+		context->spoutptr->ReleaseReceiver();
+		context->need_release = false;
+	}
+
 }
 
 static const char *win_spout_get_name(void *unused)
@@ -277,15 +319,24 @@ static void win_spout_tick(void *data, float seconds)
 
 	context->active = obs_source_active(context->source);
 	if (win_spout_sender_has_changed(context)) {
-		info("Sender %s has changed / gone away. Resetting ",
-		     context->senderName);
+		if (context->tick_status != -1) {
+			info("Sender %s has changed / gone away. Resetting ",
+			     context->senderName);
+			context->tick_status = -1;
+		}
 		context->initialized = false;
 		win_spout_deinit(data);
 		win_spout_init(data);
 		return;
 	}
 	if (!context->initialized) {
+		if (context->tick_status != -2) {
+			context->tick_status = -2;
+		}
 		win_spout_init(data);
+	}
+	if (context->tick_status != 0) {
+		context->tick_status = 0;
 	}
 }
 
@@ -307,25 +358,38 @@ static void win_spout_render(void *data, gs_effect_t *effect)
 	struct win_spout *context = (win_spout *)data;
 
 	if (!context->active) {
-		debug("inactive");
+		if (context->render_status != -1) {
+			debug("inactive");
+			context->render_status = -1;
+		}
 		return;
 	}
 
 	// tried to initialise again
 	// but failed, so we exit
 	if (!context->initialized) {
-		debug("uninit'd");
+		if (context->render_status != -2) {
+			debug("uninit'd");
+			context->render_status = -2;
+		}
 		return;
 	}
 
 	if (!context->texture) {
-		debug("no texture");
+		if (context->render_status != -3) {
+			debug("no texture");
+			context->render_status = -3;
+		}
 		return;
 	}
 
-	info("rendering context->texture");
+	if (context->render_status != 0) {
+		info("rendering context->texture");
+		context->render_status = 0;
+	}
+	
 
-	effect = obs_get_base_effect(OBS_EFFECT_OPAQUE);
+	effect = obs_get_base_effect(OBS_EFFECT_PREMULTIPLIED_ALPHA);
 
 	while (gs_effect_loop(effect, "Draw")) {
 		obs_source_draw(context->texture, 0, 0, 0, 0, false);

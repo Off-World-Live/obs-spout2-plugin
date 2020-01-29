@@ -13,4 +13,5 @@ add_library(win-spout MODULE
 target_link_libraries(win-spout
 	libobs)
 
+install(FILES ../../deps/spout/Binaries/x64/SpoutLibrary.dll DESTINATION "${OBS_PLUGIN_DESTINATION}")
 install_obs_plugin_with_data(win-spout data)
