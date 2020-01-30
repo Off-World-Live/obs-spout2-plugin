@@ -62,31 +62,13 @@ struct win_spout {
 	bool initialized;
 	bool active;
 
+	int tickspeedlimit;
+
 	int spout_status;
 	int render_status;
 	int tick_status;
 	bool need_release;
 };
-// gets the first spout sender available -- assumes that sender name
-// is maximum size 256 (default for spout SDK)
-static bool get_first_spount_sender(SPOUTHANDLE spoutptr, char *sender_name)
-{
-	int totalSenders;
-	totalSenders = spoutptr->GetSenderCount();
-	if (totalSenders == 0) {
-		return false;
-	}
-	if (!spoutptr->GetSenderName(0, sender_name))
-		return false;
-
-	blog(LOG_INFO, "Sender name %s, total senders %d", sender_name,
-	     totalSenders);
-
-	if (!spoutptr->SetActiveSender(sender_name))
-		return false;
-
-	return true;
-}
 
 /**
  * Updates sender texture details on the context
@@ -168,9 +150,10 @@ static void win_spout_init(void *data, bool forced = false)
 		return;
 	}
 		
-	if (GetTickCount64() - 5000 < context->lastCheckTick && !forced) {
+	if (GetTickCount64() - context->lastCheckTick < context->tickspeedlimit && !forced) {
 		return;
 	}
+	context->lastCheckTick = GetTickCount64();
 
 	if (context->spoutptr == NULL) {
 		if (context->spout_status != -1) {
@@ -261,7 +244,7 @@ static void win_spout_deinit(void *data)
 static const char *win_spout_get_name(void *unused)
 {
 	UNUSED_PARAMETER(unused);
-	return "Spout2 Capture";
+	return obs_module_text("sourcename");
 }
 
 static void win_spout_update(void *data, obs_data_t *settings)
@@ -278,7 +261,9 @@ static void win_spout_update(void *data, obs_data_t *settings)
 		memset(context->senderName, 0, 256);
 		strcpy(context->senderName, selectedSender);
 	}
-	
+
+	auto selectedSpeed = obs_data_get_int(settings, "tickspeedlimit");
+	context->tickspeedlimit = selectedSpeed;
 
 	if (context->initialized) {
 		win_spout_deinit(data);
@@ -288,7 +273,9 @@ static void win_spout_update(void *data, obs_data_t *settings)
 
 static void win_spout_defaults(obs_data_t *settings)
 {
-	UNUSED_PARAMETER(settings);
+	obs_data_set_default_string(settings, SPOUT_SENDER_LIST,
+				    USE_FIRST_AVAILABLE_SENDER);
+	obs_data_set_default_int(settings, "tickspeedlimit", 100);
 }
 
 static uint32_t win_spout_getwidth(void *data)
@@ -324,7 +311,7 @@ static void *win_spout_create(obs_data_t *settings, obs_source_t *source)
 	context->useFirstSender = true;
 
 	context->initialized = false;
-
+	context->tickspeedlimit = 0;
 	context->texture = NULL;
 	context->dxHandle = NULL;
 	context->active = false;
@@ -429,7 +416,7 @@ static void fill_senders(SPOUTHANDLE spoutptr, obs_property_t *list)
 	obs_property_list_clear(list);
 
 	// first option in the list should be "Take whatever is available"
-	obs_property_list_add_string(list, obs_module_text("Use First Available Sender"), USE_FIRST_AVAILABLE_SENDER);
+	obs_property_list_add_string(list, obs_module_text("usefirstavailablesender"), USE_FIRST_AVAILABLE_SENDER);
 	int totalSenders = spoutptr->GetSenderCount();
 	if (totalSenders == 0) {
 		return ;
@@ -451,10 +438,19 @@ static obs_properties_t *win_spout_properties(void *data)
 
 	obs_properties_t *props = obs_properties_create();
 
-	obs_property_t *list = obs_properties_add_list(props, SPOUT_SENDER_LIST,
+	obs_property_t *sender_list = obs_properties_add_list(props, SPOUT_SENDER_LIST,
 				obs_module_text("SpoutSenders"),OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
 
-	fill_senders(context->spoutptr, list);
+	fill_senders(context->spoutptr, sender_list);
+
+	obs_property_t *tick_speed_limit_list = obs_properties_add_list(
+		props, "tickspeedlimit", obs_module_text("tickspeedlimit"),
+		OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
+	obs_property_list_add_int(tick_speed_limit_list, obs_module_text("tickspeedcrazy"),1);
+	obs_property_list_add_int(tick_speed_limit_list, obs_module_text("tickspeedfast"),100);
+	obs_property_list_add_int(tick_speed_limit_list, obs_module_text("tickspeednormal"), 500);
+	obs_property_list_add_int(tick_speed_limit_list, obs_module_text("tickspeedslow"), 1000);
+	
 
 	return props;
 }
