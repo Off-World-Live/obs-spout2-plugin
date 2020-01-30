@@ -1,3 +1,7 @@
+if (NOT WIN32)
+	return()
+endif()
+
 project(win-spout)
 
 if(MSVC)
@@ -13,5 +17,10 @@ add_library(win-spout MODULE
 target_link_libraries(win-spout
 	libobs)
 
-install(FILES ../../deps/spout/Binaries/x64/SpoutLibrary.dll DESTINATION "${OBS_PLUGIN_DESTINATION}")
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+	install(FILES ../../deps/spout/Binaries/x64/SpoutLibrary.dll DESTINATION "${OBS_PLUGIN_DESTINATION}")
+else()
+	install(FILES ../../deps/spout/Binaries/Win32/SpoutLibrary.dll DESTINATION "${OBS_PLUGIN_DESTINATION}")
+endif()
+
 install_obs_plugin_with_data(win-spout data)

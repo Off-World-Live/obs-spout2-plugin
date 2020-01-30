@@ -54,7 +54,7 @@ struct win_spout {
 
 	SPOUTHANDLE spoutptr;
 
-	DWORD lastCheckTick;
+	ULONGLONG lastCheckTick;
 
 	int width;
 	int height;
@@ -168,8 +168,7 @@ static void win_spout_init(void *data, bool forced = false)
 		return;
 	}
 		
-
-	if (GetTickCount() - 5000 < context->lastCheckTick && !forced) {
+	if (GetTickCount64() - 5000 < context->lastCheckTick && !forced) {
 		return;
 	}
 
@@ -180,24 +179,52 @@ static void win_spout_init(void *data, bool forced = false)
 		}
 		return;
 	}
+	int totalSenders = context->spoutptr->GetSenderCount();
+	if (totalSenders == 0) {
+		if (context->spout_status != -2) {
+			info("No active Spout cameras");
+			context->spout_status = -2;
+		}
+		return;
+	}
 
 	if (context->useFirstSender) {
-		if (!get_first_spount_sender(context->spoutptr,
-					     context->senderName)) {
-			if (context->spout_status != -2) {
-				info("No active Spout cameras");
-				context->spout_status = -2;
+		if (context->spoutptr->GetSenderName(0, context->senderName)) {
+			if (!context->spoutptr->SetActiveSender(
+				    context->senderName)) {
+				if (context->spout_status != -4) {
+					info("WoW , i can't set active sender as %s",context->senderName);
+					context->spout_status = -4;
+				}
+				return;
 			}
-
-			return;
-		}
-	} else {
-		if (context->spoutptr->GetSenderCount() == 0) {
+		} else {
 			if (context->spout_status != -3) {
-				info("No Spout senders active");
+				info("Strange , there is a sender without name ?");
 				context->spout_status = -3;
 			}
 			return;
+		}
+	} else {
+		int index;
+		char senderName[256];
+		bool isExist = false;
+		// then get the name of each sender from SPOUT
+		for (index = 0; index < totalSenders; index++) {
+			context->spoutptr->GetSenderName(index, senderName);
+			if (strcmp(senderName, context->senderName) == 0) {
+				isExist = true;
+				break;
+			}
+		}
+		if (!isExist) {
+			if (context->spout_status != -5) {
+				info("Sorry, Sender Name %s not found",context->senderName);
+				context->spout_status = -5;
+			}
+			return;
+		} else {
+			context->spout_status = 0;
 		}
 	}
 
