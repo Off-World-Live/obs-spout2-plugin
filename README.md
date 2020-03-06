@@ -44,7 +44,6 @@ Thanks to the authors of [SPOUT](https://github.com/leadedge/Spout2) for the lib
 - Carefully follow their [build instructions](https://obsproject.com/wiki/install-instructions#windows-build-directions)
 - Add this repo as a submodule inside the plugins folder: `git submodule add git@github.com/Off-World-Live/obs-spout2-source-plugin.git plugins/win-spout`
 - Download the latest [Spout Source](https://github.com/leadedge/Spout2/releases) and extract the contents of [this folder](https://github.com/leadedge/Spout2/tree/master/SpoutSDK/Source/SPOUT_LIBRARY) into a new folder `/deps/spout` inside the OBS Source code directory
-- After building, be sure to copy [Spout.dll](https://github.com/leadedge/Spout2/blob/master/SpoutSDK/Source/SPOUT_LIBRARY/Binaries/x64/SpoutLibrary.dll) to your the `obs-plugins` directory inside your `build/runtime/Debug` folder. (I haven't worked out how to get CMake to do this automatically - suggestions / PRS welcome.
 - So far I have only built this in 64bit but I see no reason why it should not work with 32bit builds.
 
 ### Building the windows installer
@@ -57,7 +56,7 @@ Pull Requests welcome!
 
 ## Roadmap
 
-- [ ] Improve CMakeLists.txt to copy `Spout.dll` automatically
+- [x] Improve CMakeLists.txt to copy `Spout.dll` automatically (thanks to [@shugen002](https://github.com/shugen002))
 - [ ] Check DirectX version and disable if not compatible
 
 ## License
