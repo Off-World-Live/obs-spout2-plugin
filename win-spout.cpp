@@ -40,6 +40,10 @@ OBS_MODULE_USE_DEFAULT_LOCALE("win-spout", "en-US")
 #define SPOUT_SENDER_LIST "spoutsenders"
 #define USE_FIRST_AVAILABLE_SENDER "usefirstavailablesender"
 #define SPOUT_TICK_SPEED_LIMIT "tickspeedlimit"
+#define SPOUT_COMPOSITE_MODE "compositemode"
+
+#define COMPOSITE_MODE_OPAQUE 1
+#define COMPOSITE_MODE_ALPHA 2
 
 struct win_spout {
 	obs_source_t *source;
@@ -64,6 +68,8 @@ struct win_spout {
 	bool active;
 
 	ULONGLONG tick_speed_limit;
+
+	ULONGLONG composite_mode;
 
 	int spout_status;
 	int render_status;
@@ -244,6 +250,9 @@ static void win_spout_update(void *data, obs_data_t *settings)
 	auto selectedSpeed = obs_data_get_int(settings, SPOUT_TICK_SPEED_LIMIT);
 	context->tick_speed_limit = selectedSpeed;
 
+	auto compositeMode = obs_data_get_int(settings, SPOUT_COMPOSITE_MODE);
+	context->composite_mode = compositeMode;
+
 	if (context->initialized) {
 		win_spout_deinit(data);
 		win_spout_init(data);
@@ -381,7 +390,11 @@ static void win_spout_render(void *data, gs_effect_t *effect)
 		context->render_status = 0;
 	}
 
-	effect = obs_get_base_effect(OBS_EFFECT_OPAQUE);
+	if(context->composite_mode == COMPOSITE_MODE_OPAQUE) {
+		effect = obs_get_base_effect(OBS_EFFECT_OPAQUE);
+	} else {
+		effect = obs_get_base_effect(OBS_EFFECT_PREMULTIPLIED_ALPHA);
+	}
 
 	while (gs_effect_loop(effect, "Draw")) {
 		obs_source_draw(context->texture, 0, 0, 0, 0, false);
@@ -422,6 +435,21 @@ static obs_properties_t *win_spout_properties(void *data)
 		OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
 
 	fill_senders(context->spoutptr, sender_list);
+
+	obs_property_t *composite_mode_list = obs_properties_add_list(
+		props,
+		SPOUT_COMPOSITE_MODE,
+		obs_module_text("compositemode"),
+		OBS_COMBO_TYPE_LIST,
+		OBS_COMBO_FORMAT_INT);
+	obs_property_list_add_int(
+		composite_mode_list,
+		obs_module_text("compositemodeopaque"),
+		COMPOSITE_MODE_OPAQUE);
+	obs_property_list_add_int(
+		composite_mode_list,
+		obs_module_text("compositemodealpha"),
+		COMPOSITE_MODE_ALPHA);
 
 	obs_property_t *tick_speed_limit_list = obs_properties_add_list(
 		props, SPOUT_TICK_SPEED_LIMIT, obs_module_text("tickspeedlimit"),
