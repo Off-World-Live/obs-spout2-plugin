@@ -44,6 +44,7 @@ OBS_MODULE_USE_DEFAULT_LOCALE("win-spout", "en-US")
 
 #define COMPOSITE_MODE_OPAQUE 1
 #define COMPOSITE_MODE_ALPHA 2
+#define COMPOSITE_MODE_DEFAULT 3
 
 struct win_spout {
 	obs_source_t *source;
@@ -390,10 +391,19 @@ static void win_spout_render(void *data, gs_effect_t *effect)
 		context->render_status = 0;
 	}
 
-	if(context->composite_mode == COMPOSITE_MODE_OPAQUE) {
+	switch (context->composite_mode) {
+	case COMPOSITE_MODE_OPAQUE:
 		effect = obs_get_base_effect(OBS_EFFECT_OPAQUE);
-	} else {
+		break;
+	case COMPOSITE_MODE_ALPHA:
 		effect = obs_get_base_effect(OBS_EFFECT_PREMULTIPLIED_ALPHA);
+		break;
+	case COMPOSITE_MODE_DEFAULT:
+		effect = obs_get_base_effect(OBS_EFFECT_DEFAULT);
+		break;
+	default:
+		effect = obs_get_base_effect(OBS_EFFECT_OPAQUE);
+		break;
 	}
 
 	while (gs_effect_loop(effect, "Draw")) {
@@ -437,19 +447,17 @@ static obs_properties_t *win_spout_properties(void *data)
 	fill_senders(context->spoutptr, sender_list);
 
 	obs_property_t *composite_mode_list = obs_properties_add_list(
-		props,
-		SPOUT_COMPOSITE_MODE,
-		obs_module_text("compositemode"),
-		OBS_COMBO_TYPE_LIST,
-		OBS_COMBO_FORMAT_INT);
-	obs_property_list_add_int(
-		composite_mode_list,
-		obs_module_text("compositemodeopaque"),
-		COMPOSITE_MODE_OPAQUE);
-	obs_property_list_add_int(
-		composite_mode_list,
-		obs_module_text("compositemodealpha"),
-		COMPOSITE_MODE_ALPHA);
+		props, SPOUT_COMPOSITE_MODE, obs_module_text("compositemode"),
+		OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
+	obs_property_list_add_int(composite_mode_list,
+				  obs_module_text("compositemodeopaque"),
+				  COMPOSITE_MODE_OPAQUE);
+	obs_property_list_add_int(composite_mode_list,
+				  obs_module_text("compositemodealpha"),
+				  COMPOSITE_MODE_ALPHA);
+	obs_property_list_add_int(composite_mode_list,
+				  obs_module_text("compositemodedefault"),
+				  COMPOSITE_MODE_DEFAULT);
 
 	obs_property_t *tick_speed_limit_list = obs_properties_add_list(
 		props, SPOUT_TICK_SPEED_LIMIT, obs_module_text("tickspeedlimit"),
