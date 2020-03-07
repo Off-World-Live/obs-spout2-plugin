@@ -39,6 +39,12 @@ OBS_MODULE_USE_DEFAULT_LOCALE("win-spout", "en-US")
 
 #define SPOUT_SENDER_LIST "spoutsenders"
 #define USE_FIRST_AVAILABLE_SENDER "usefirstavailablesender"
+#define SPOUT_TICK_SPEED_LIMIT "tickspeedlimit"
+#define SPOUT_COMPOSITE_MODE "compositemode"
+
+#define COMPOSITE_MODE_OPAQUE 1
+#define COMPOSITE_MODE_ALPHA 2
+#define COMPOSITE_MODE_DEFAULT 3
 
 struct win_spout {
 	obs_source_t *source;
@@ -54,52 +60,37 @@ struct win_spout {
 
 	SPOUTHANDLE spoutptr;
 
-	DWORD lastCheckTick;
+	ULONGLONG lastCheckTick;
 
 	int width;
 	int height;
 
 	bool initialized;
 	bool active;
+
+	ULONGLONG tick_speed_limit;
+
+	ULONGLONG composite_mode;
+
+	int spout_status;
+	int render_status;
+	int tick_status;
+	bool should_release;
 };
-// gets the first spout sender available -- assumes that sender name
-// is maximum size 256 (default for spout SDK)
-static bool get_first_spount_sender(SPOUTHANDLE spoutptr, char *sender_name)
-{
-	int totalSenders;
-	totalSenders = spoutptr->GetSenderCount();
-	if (totalSenders == 0) {
-		return false;
-	}
-	if (!spoutptr->GetSenderName(0, sender_name))
-		return false;
-
-	blog(LOG_INFO, "Sender name %s, total senders %d", sender_name,
-	     totalSenders);
-
-	if (!spoutptr->SetActiveSender(sender_name))
-		return false;
-
-	return true;
-}
 
 /**
- * Updates sender texture details on the context
+ * Writes sender texture details (width & height) to the context
  * @return bool success
  */
-static bool win_spout_get_sender_info(win_spout * context)
+static bool win_spout_store_sender_info(win_spout *context)
 {
 	unsigned int width, height;
 	// get info about this active sender:
 	if (!context->spoutptr->GetSenderInfo(context->senderName, width,
 					      height, context->dxHandle,
 					      context->dxFormat)) {
-		warn("Named sender not found w: %d, h: %d", width, height);
 		return false;
 	}
-
-	info("Sender %s is of dimensions %d x %d", context->senderName, width,
-	     height);
 
 	context->width = width;
 	context->height = height;
@@ -112,63 +103,108 @@ static bool win_spout_get_sender_info(win_spout * context)
  *
  * @return bool sender data has changed
  */
-static bool win_spout_sender_has_changed(win_spout * context)
+static bool win_spout_sender_has_changed(win_spout *context)
 {
 	DWORD oldFormat = context->dxFormat;
 	auto oldWidth = context->width;
 	auto oldHeight = context->height;
 
-	if (!win_spout_get_sender_info(context)) {
+	if (!win_spout_store_sender_info(context)) {
 		// assume that if it fails, it has changed
 		// ie sender no longer exists
 		return true;
 	}
-	if (
-		context->width != oldWidth ||
-		context->height != oldHeight ||
-		oldFormat != context->dxFormat
-		)
-	{
+	if (context->width != oldWidth || context->height != oldHeight ||
+	    oldFormat != context->dxFormat) {
 		return true;
 	}
 	return false;
 }
 
-
-
 static void win_spout_init(void *data, bool forced = false)
 {
 	struct win_spout *context = (win_spout *)data;
-	if (context->initialized)
-		return;
-
-	if (GetTickCount() - 5000 < context->lastCheckTick && !forced) {
+	if (context->initialized) {
+		context->spout_status = 0;
 		return;
 	}
 
+	if (GetTickCount64() - context->lastCheckTick <
+		    context->tick_speed_limit &&
+	    !forced) {
+		return;
+	}
+	context->lastCheckTick = GetTickCount64();
+
 	if (context->spoutptr == NULL) {
-		warn("Spout pointer didn't exist");
+		if (context->spout_status != -1) {
+			warn("Spout pointer didn't exist");
+			context->spout_status = -1;
+		}
+		return;
+	}
+	int totalSenders = context->spoutptr->GetSenderCount();
+	if (totalSenders == 0) {
+		if (context->spout_status != -2) {
+			info("No active Spout cameras");
+			context->spout_status = -2;
+		}
 		return;
 	}
 
 	if (context->useFirstSender) {
-		if (!get_first_spount_sender(context->spoutptr,
-					     context->senderName)) {
-			info("No active Spout cameras");
+		if (context->spoutptr->GetSenderName(0, context->senderName)) {
+			if (!context->spoutptr->SetActiveSender(
+				    context->senderName)) {
+				if (context->spout_status != -4) {
+					info("WoW , i can't set active sender as %s",
+					     context->senderName);
+					context->spout_status = -4;
+				}
+				return;
+			}
+		} else {
+			if (context->spout_status != -3) {
+				info("Strange , there is a sender without name ?");
+				context->spout_status = -3;
+			}
 			return;
 		}
 	} else {
-		if (context->spoutptr->GetSenderCount() == 0) {
-			info("No Spout senders active");
+		int index;
+		char senderName[256];
+		bool exists = false;
+		// then get the name of each sender from SPOUT
+		for (index = 0; index < totalSenders; index++) {
+			context->spoutptr->GetSenderName(index, senderName);
+			if (strcmp(senderName, context->senderName) == 0) {
+				exists = true;
+				break;
+			}
+		}
+		if (!exists) {
+			if (context->spout_status != -5) {
+				info("Sorry, Sender Name %s not found",
+				     context->senderName);
+				context->spout_status = -5;
+			}
 			return;
+		} else {
+			context->spout_status = 0;
 		}
 	}
 
 	info("Getting info for sender %s", context->senderName);
-	win_spout_get_sender_info(context);
+	if (!win_spout_store_sender_info(context)) {
+		warn("Named %s sender not found", context->senderName);
+	} else {
+		info("Sender %s is of dimensions %d x %d", context->senderName,
+		     context->width, context->height);
+	};
 
 	obs_enter_graphics();
 	gs_texture_destroy(context->texture);
+	context->should_release = true;
 	context->texture = gs_texture_open_shared((uint32_t)context->dxHandle);
 	obs_leave_graphics();
 
@@ -186,13 +222,16 @@ static void win_spout_deinit(void *data)
 		context->texture = NULL;
 	}
 	// cleanup spout
-	context->spoutptr->ReleaseReceiver();
+	if (context->should_release) {
+		context->spoutptr->ReleaseReceiver();
+		context->should_release = false;
+	}
 }
 
 static const char *win_spout_get_name(void *unused)
 {
 	UNUSED_PARAMETER(unused);
-	return "Spout2 Capture";
+	return obs_module_text("sourcename");
 }
 
 static void win_spout_update(void *data, obs_data_t *settings)
@@ -201,15 +240,19 @@ static void win_spout_update(void *data, obs_data_t *settings)
 
 	auto selectedSender = obs_data_get_string(settings, SPOUT_SENDER_LIST);
 
-	if (strcmp(selectedSender, USE_FIRST_AVAILABLE_SENDER) == 0)
-	{
+	if (strcmp(selectedSender, USE_FIRST_AVAILABLE_SENDER) == 0) {
 		context->useFirstSender = true;
 	} else {
 		context->useFirstSender = false;
 		memset(context->senderName, 0, 256);
 		strcpy(context->senderName, selectedSender);
 	}
-	
+
+	auto selectedSpeed = obs_data_get_int(settings, SPOUT_TICK_SPEED_LIMIT);
+	context->tick_speed_limit = selectedSpeed;
+
+	auto compositeMode = obs_data_get_int(settings, SPOUT_COMPOSITE_MODE);
+	context->composite_mode = compositeMode;
 
 	if (context->initialized) {
 		win_spout_deinit(data);
@@ -219,7 +262,9 @@ static void win_spout_update(void *data, obs_data_t *settings)
 
 static void win_spout_defaults(obs_data_t *settings)
 {
-	UNUSED_PARAMETER(settings);
+	obs_data_set_default_string(settings, SPOUT_SENDER_LIST,
+				    USE_FIRST_AVAILABLE_SENDER);
+	obs_data_set_default_int(settings, "tickspeedlimit", 100);
 }
 
 static uint32_t win_spout_getwidth(void *data)
@@ -255,7 +300,7 @@ static void *win_spout_create(obs_data_t *settings, obs_source_t *source)
 	context->useFirstSender = true;
 
 	context->initialized = false;
-
+	context->tick_speed_limit = 0;
 	context->texture = NULL;
 	context->dxHandle = NULL;
 	context->active = false;
@@ -277,15 +322,24 @@ static void win_spout_tick(void *data, float seconds)
 
 	context->active = obs_source_active(context->source);
 	if (win_spout_sender_has_changed(context)) {
-		info("Sender %s has changed / gone away. Resetting ",
-		     context->senderName);
+		if (context->tick_status != -1) {
+			info("Sender %s has changed / gone away. Resetting ",
+			     context->senderName);
+			context->tick_status = -1;
+		}
 		context->initialized = false;
 		win_spout_deinit(data);
 		win_spout_init(data);
 		return;
 	}
 	if (!context->initialized) {
+		if (context->tick_status != -2) {
+			context->tick_status = -2;
+		}
 		win_spout_init(data);
+	}
+	if (context->tick_status != 0) {
+		context->tick_status = 0;
 	}
 }
 
@@ -307,25 +361,50 @@ static void win_spout_render(void *data, gs_effect_t *effect)
 	struct win_spout *context = (win_spout *)data;
 
 	if (!context->active) {
-		debug("inactive");
+		if (context->render_status != -1) {
+			debug("inactive");
+			context->render_status = -1;
+		}
 		return;
 	}
 
 	// tried to initialise again
 	// but failed, so we exit
 	if (!context->initialized) {
-		debug("uninit'd");
+		if (context->render_status != -2) {
+			debug("uninit'd");
+			context->render_status = -2;
+		}
 		return;
 	}
 
 	if (!context->texture) {
-		debug("no texture");
+		if (context->render_status != -3) {
+			debug("no texture");
+			context->render_status = -3;
+		}
 		return;
 	}
 
-	info("rendering context->texture");
+	if (context->render_status != 0) {
+		info("rendering context->texture");
+		context->render_status = 0;
+	}
 
-	effect = obs_get_base_effect(OBS_EFFECT_OPAQUE);
+	switch (context->composite_mode) {
+	case COMPOSITE_MODE_OPAQUE:
+		effect = obs_get_base_effect(OBS_EFFECT_OPAQUE);
+		break;
+	case COMPOSITE_MODE_ALPHA:
+		effect = obs_get_base_effect(OBS_EFFECT_PREMULTIPLIED_ALPHA);
+		break;
+	case COMPOSITE_MODE_DEFAULT:
+		effect = obs_get_base_effect(OBS_EFFECT_DEFAULT);
+		break;
+	default:
+		effect = obs_get_base_effect(OBS_EFFECT_OPAQUE);
+		break;
+	}
 
 	while (gs_effect_loop(effect, "Draw")) {
 		obs_source_draw(context->texture, 0, 0, 0, 0, false);
@@ -338,16 +417,17 @@ static void fill_senders(SPOUTHANDLE spoutptr, obs_property_t *list)
 	obs_property_list_clear(list);
 
 	// first option in the list should be "Take whatever is available"
-	obs_property_list_add_string(list, obs_module_text("Use First Available Sender"), USE_FIRST_AVAILABLE_SENDER);
+	obs_property_list_add_string(list,
+				     obs_module_text("usefirstavailablesender"),
+				     USE_FIRST_AVAILABLE_SENDER);
 	int totalSenders = spoutptr->GetSenderCount();
 	if (totalSenders == 0) {
-		return ;
+		return;
 	}
 	int index;
 	char senderName[256];
 	// then get the name of each sender from SPOUT
-	for (index = 0; index < totalSenders; index++)
-	{
+	for (index = 0; index < totalSenders; index++) {
 		spoutptr->GetSenderName(index, senderName);
 		obs_property_list_add_string(list, senderName, senderName);
 	}
@@ -360,10 +440,36 @@ static obs_properties_t *win_spout_properties(void *data)
 
 	obs_properties_t *props = obs_properties_create();
 
-	obs_property_t *list = obs_properties_add_list(props, SPOUT_SENDER_LIST,
-				obs_module_text("SpoutSenders"),OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
+	obs_property_t *sender_list = obs_properties_add_list(
+		props, SPOUT_SENDER_LIST, obs_module_text("SpoutSenders"),
+		OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
 
-	fill_senders(context->spoutptr, list);
+	fill_senders(context->spoutptr, sender_list);
+
+	obs_property_t *composite_mode_list = obs_properties_add_list(
+		props, SPOUT_COMPOSITE_MODE, obs_module_text("compositemode"),
+		OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
+	obs_property_list_add_int(composite_mode_list,
+				  obs_module_text("compositemodeopaque"),
+				  COMPOSITE_MODE_OPAQUE);
+	obs_property_list_add_int(composite_mode_list,
+				  obs_module_text("compositemodealpha"),
+				  COMPOSITE_MODE_ALPHA);
+	obs_property_list_add_int(composite_mode_list,
+				  obs_module_text("compositemodedefault"),
+				  COMPOSITE_MODE_DEFAULT);
+
+	obs_property_t *tick_speed_limit_list = obs_properties_add_list(
+		props, SPOUT_TICK_SPEED_LIMIT, obs_module_text("tickspeedlimit"),
+		OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
+	obs_property_list_add_int(tick_speed_limit_list,
+				  obs_module_text("tickspeedcrazy"), 1);
+	obs_property_list_add_int(tick_speed_limit_list,
+				  obs_module_text("tickspeedfast"), 100);
+	obs_property_list_add_int(tick_speed_limit_list,
+				  obs_module_text("tickspeednormal"), 500);
+	obs_property_list_add_int(tick_speed_limit_list,
+				  obs_module_text("tickspeedslow"), 1000);
 
 	return props;
 }

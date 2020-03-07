@@ -43,10 +43,11 @@ Section "Spout 2 OBS Plugin" Section1
 	File "..\..\build64\plugins\win-spout\Release\win-spout.dll"
 	File "..\..\build64\plugins\win-spout\Release\win-spout.exp"
 	File "..\..\build64\plugins\win-spout\Release\win-spout.lib"
-	File "third-party\SpoutLibrary.dll"
-	File "third-party\SpoutLibrary.lib"
+	File "..\..\deps\spout\Binaries\x64\SpoutLibrary.dll"
+	File "..\..\deps\spout\Binaries\x64\SpoutLibrary.lib"
 	SetOutPath "$INSTDIR\data\obs-plugins\win-spout\locale\"
 	File "data\locale\en-US.ini"
+	File "data\locale\zh-CN.ini"
 	CreateDirectory "$SMPROGRAMS\Spout 2 OBS Plugin"
 	CreateShortCut "$SMPROGRAMS\Spout 2 OBS Plugin\Uninstall Spout2 OBS Plugin.lnk" "$INSTDIR\obs-plugins\uninstall-spout2-plugin.exe"
 
@@ -93,6 +94,7 @@ Section Uninstall
 	Delete "$INSTDIR\64bit\SpoutLibrary.dll"
 	Delete "$INSTDIR\64bit\SpoutLibrary.lib"
 	Delete "$INSTDIR\..\data\obs-plugins\win-spout\locale\en-US.ini"
+	Delete "$INSTDIR\..\data\obs-plugins\win-spout\locale\zh-CN.ini"
 
 	; Remove remaining directories
 	RMDir "$SMPROGRAMS\Spout 2 OBS Plugin"
