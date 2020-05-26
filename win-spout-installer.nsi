@@ -2,14 +2,18 @@
 
 ; Define your application name
 !define APPNAME "Spout 2 OBS Plugin"
-!define APPVERSION "0.2"
+!define APPVERSION "0.4"
 !define APPNAMEANDVERSION "Spout 2 OBS Plugin ${APPVERSION}"
 
 ; Main Install settings
 Name "${APPNAMEANDVERSION}"
-InstallDir "$PROGRAMFILES32\obs-studio"
 InstallDirRegKey HKLM "Software\${APPNAME}" ""
+InstallDir "$PROGRAMFILES64\obs-studio"
 OutFile "OBS_Spout2_Plugin_Install_v${APPVERSION}.exe"
+
+Var INSTALL_BASE_DIR
+Var OBS_INSTALL_DIR
+
 
 ; Use compression
 SetCompressor Zlib
@@ -31,8 +35,22 @@ SetCompressor Zlib
 ; Set languages (first is default language)
 !insertmacro MUI_LANGUAGE "English"
 !insertmacro MUI_RESERVEFILE_LANGDLL
-
 Section "Spout 2 OBS Plugin" Section1
+	StrCpy $INSTALL_BASE_DIR "$PROGRAMFILES64\obs-studio"
+
+	ReadRegStr $OBS_INSTALL_DIR HKLM "SOFTWARE\OBS Studio" ""
+
+	!if "$OBS_INSTALL_DIR" != ""
+		StrCpy $INSTALL_BASE_DIR "$OBS_INSTALL_DIR"
+	!endif
+
+
+	StrCpy $InstDir "$INSTALL_BASE_DIR"
+
+	IfFileExists "$INSTDIR\*.*" +3
+		MessageBox MB_OK|MB_ICONSTOP "OBS Directory doesn't exist!"
+		Abort
+
 
 	; Set Section properties
 	SetOverwrite on
