@@ -1,8 +1,8 @@
 ---
 name: Bug report
 about: Create a report to help us improve
-title: "[BUG]"
-labels: ''
+title: ''
+labels: bug
 assignees: ''
 
 ---
@@ -20,18 +20,23 @@ Steps to reproduce the behavior:
 **Expected behavior**
 A clear and concise description of what you expected to happen.
 
+_Please attach any logs from OBS -- Go to `help` -> `logs` -> `currentLogs`_
+
 **Screenshots**
 If applicable, add screenshots to help explain your problem.
 
 **About the Software:**
  - OBS Version [e.g 26.0]
  - OBS Spout 2 Source Plugin Version [ e.g 0.3]
+
+
 **About Your Machine :**
  - OS: [e.g. Windows 10 Pro]
  - GPU [e.g. Nvidia RTX 2080ti]
  - NVidia Driver Version [e.g. 4.0131]
  - RAM [ e.g. 16GB]
- - Machine Type (ie laptop / desktop)
+ - Machine Type [ie laptop / desktop + model]
+ - Battery Mode [ie plugged in / on battery]
   
 
 **Additional context**
