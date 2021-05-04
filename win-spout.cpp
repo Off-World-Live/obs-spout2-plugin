@@ -9,6 +9,7 @@
  */
 #include <obs-module.h>
 #include <graphics/image-file.h>
+#include <graphics/graphics.h>
 #include <util/platform.h>
 #include <util/dstr.h>
 #include <sys/stat.h>
@@ -407,7 +408,10 @@ static void win_spout_render(void *data, gs_effect_t *effect)
 	}
 
 	while (gs_effect_loop(effect, "Draw")) {
+		bool linearRGB = gs_get_linear_srgb();
+		gs_set_linear_srgb(false);
 		obs_source_draw(context->texture, 0, 0, 0, 0, false);
+		gs_set_linear_srgb(linearRGB);
 	}
 }
 
