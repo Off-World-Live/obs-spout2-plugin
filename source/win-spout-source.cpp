@@ -46,7 +46,6 @@ struct spout_source {
 	int spout_status;
 	int render_status;
 	int tick_status;
-	//bool should_release;
 };
 
 /**
@@ -152,7 +151,6 @@ static void win_spout_source_init(void *data, bool forced = false)
 
 	obs_enter_graphics();
 	gs_texture_destroy(context->texture);
-	//context->should_release = true;
 	context->texture = gs_texture_open_shared((uint32_t)context->dxHandle);
 	obs_leave_graphics();
 
@@ -169,11 +167,6 @@ static void win_spout_source_deinit(void *data)
 		obs_leave_graphics();
 		context->texture = NULL;
 	}
-	//// cleanup spout
-	//if (context->should_release) {
-	//	spoutptr->ReleaseReceiver();
-	//	context->should_release = false;
-	//}
 }
 
 static void win_spout_source_update(void *data, obs_data_t *settings)
