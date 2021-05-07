@@ -10,7 +10,7 @@ if(MSVC)
 endif()
 
 set(win-spout_SOURCES
-	win-spout.cpp)
+	source/win-spout.cpp
 
 add_library(win-spout MODULE
 	${win-spout_SOURCES})
