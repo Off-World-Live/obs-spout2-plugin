@@ -1,5 +1,5 @@
 /**
- * copyright Off World Live Ltd (https://offworld.live), 2019-2021
+ * Copyright Off World Live Ltd (https://offworld.live), 2019-2021
  *
  * and licenced under the GPL v2 (https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
  *
@@ -9,6 +9,9 @@
 
 #include <obs-module.h>
 #include "win-spout.h"
+
+#include "SpoutLibrary.h"
+#pragma comment(lib, "SpoutLibrary.lib")
 
 #define debug(message, ...)                                                    \
 	blog(LOG_DEBUG, "[%s] " message, obs_source_get_name(context->source), \
@@ -46,6 +49,7 @@ struct spout_source {
 	int spout_status;
 	int render_status;
 	int tick_status;
+	SPOUTHANDLE spout_receiver_ptr;
 };
 
 /**
@@ -56,7 +60,7 @@ static bool win_spout_source_store_sender_info(spout_source *context)
 {
 	unsigned int width, height;
 	// get info about this active sender:
-	if (!spoutptr->GetSenderInfo(context->senderName, width,
+	if (!context->spout_receiver_ptr->GetSenderInfo(context->senderName, width,
 					height, context->dxHandle,
 					context->dxFormat)) {
 		return false;
@@ -82,7 +86,7 @@ static void win_spout_source_init(void *data, bool forced = false)
 	}
 	context->lastCheckTick = GetTickCount64();
 
-	if (spoutptr == NULL) {
+	if (context->spout_receiver_ptr == NULL) {
 		if (context->spout_status != -1) {
 			warn("Spout pointer didn't exist");
 			context->spout_status = -1;
@@ -90,7 +94,7 @@ static void win_spout_source_init(void *data, bool forced = false)
 		return;
 	}
 
-	int totalSenders = spoutptr->GetSenderCount();
+	int totalSenders = context->spout_receiver_ptr->GetSenderCount();
 
 	if (totalSenders == 0) {
 		if (context->spout_status != -2) {
@@ -101,8 +105,8 @@ static void win_spout_source_init(void *data, bool forced = false)
 	}
 
 	if (context->useFirstSender) {
-		if (spoutptr->GetSender(0, context->senderName)) {
-			if (!spoutptr->SetActiveSender(
+		if (context->spout_receiver_ptr->GetSenderName(0, context->senderName)) {
+			if (!context->spout_receiver_ptr->SetActiveSender(
 				    context->senderName)) {
 				if (context->spout_status != -4) {
 					info("WoW , i can't set active sender as %s", context->senderName);
@@ -123,7 +127,7 @@ static void win_spout_source_init(void *data, bool forced = false)
 		bool exists = false;
 		// then get the name of each sender from SPOUT
 		for (index = 0; index < totalSenders; index++) {
-			spoutptr->GetSender(index, senderName);
+			context->spout_receiver_ptr->GetSenderName(index, senderName);
 			if (strcmp(senderName, context->senderName) == 0) {
 				exists = true;
 				break;
@@ -207,6 +211,7 @@ static void *win_spout_source_create(obs_data_t *settings, obs_source_t *source)
 {
 	struct spout_source *context = (spout_source *)bzalloc(sizeof(spout_source));
 	info("initialising spout source");
+	context->spout_receiver_ptr = GetSpout();
 	context->source = source;
 	context->useFirstSender = true;
 	context->initialized = false;
@@ -229,6 +234,11 @@ static void win_spout_source_destroy(void *data)
 	struct spout_source *context = (spout_source *)data;
 
 	win_spout_source_deinit(data);
+
+	if (context->spout_receiver_ptr != NULL) {
+		context->spout_receiver_ptr->Release();
+		context->spout_receiver_ptr = nullptr;
+	}
 
 	bfree(context);
 }
@@ -313,10 +323,7 @@ static void win_spout_source_render(void *data, gs_effect_t *effect)
 	}
 
 	while (gs_effect_loop(effect, "Draw")) {
-		bool linearRGB = gs_get_linear_srgb();
-		gs_set_linear_srgb(false);
 		obs_source_draw(context->texture, 0, 0, 0, 0, false);
-		gs_set_linear_srgb(linearRGB);
 	}
 }
 
@@ -373,7 +380,7 @@ static void win_spout_source_tick(void *data, float seconds)
 	}
 }
 
-static void fill_senders(obs_property_t *list)
+static void fill_senders(SPOUTHANDLE spoutptr, obs_property_t *list)
 {
 	// clear the list first
 	obs_property_list_clear(list);
@@ -390,7 +397,7 @@ static void fill_senders(obs_property_t *list)
 	char senderName[256];
 	// then get the name of each sender from SPOUT
 	for (index = 0; index < totalSenders; index++) {
-		spoutptr->GetSender(index, senderName);
+		spoutptr->GetSenderName(index, senderName);
 		obs_property_list_add_string(list, senderName, senderName);
 	}
 }
@@ -406,7 +413,7 @@ static obs_properties_t *win_spout_properties(void *data)
 		props, SPOUT_SENDER_LIST, obs_module_text("SpoutSenders"),
 		OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
 
-	fill_senders(sender_list);
+	fill_senders(context->spout_receiver_ptr, sender_list);
 
 	obs_property_t *composite_mode_list = obs_properties_add_list(
 		props, SPOUT_COMPOSITE_MODE, obs_module_text("compositemode"),
@@ -440,7 +447,7 @@ static obs_properties_t *win_spout_properties(void *data)
 struct obs_source_info create_spout_source_info()
 {
 	struct obs_source_info spout_source_info = {};
-	spout_source_info.id = "spout_capture";
+	spout_source_info.id = "spout_input";
 	spout_source_info.type = OBS_SOURCE_TYPE_INPUT;
 	spout_source_info.output_flags = OBS_SOURCE_VIDEO |
 					 OBS_SOURCE_CUSTOM_DRAW;

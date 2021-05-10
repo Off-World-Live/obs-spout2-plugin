@@ -25,27 +25,20 @@ Thanks to the authors of [SPOUT](https://github.com/leadedge/Spout2) for the lib
 
 ## Installation
 
-**N.B. For now I have only released a x64 build**
-
 - Go to the [Releases Page](https://github.com/Off-World-Live/obs-spout2-source-plugin/releases)
 - Download the windows installer: `OBS_Spout2_Plugin_Installer.exe`
 - Run the installer (accepting installation from untrusted source)
 - Select the `OBS` directory if not the default install location
 
-### Manual Installation
-
-- If you are unable to run the installer, download the release zip file `OBS_SPOUT2_Plugin_Build_xxx.zip`
-- Extract the entire contents into your OBS directory
-- Verify that `win-spout.dll` is in the dir `<obs-install>\obs-plugins\64bit`
-
+> N.B there are no current plans for 32bit builds, although theoretically this should be possible
 ## Contributing / Building
 
 - Clone the [main OBS repository](https://github.com/obsproject/obs-studio)
-- Carefully follow their [build instructions](https://obsproject.com/wiki/install-instructions#windows-build-directions)
+- Carefully follow their [build instructions](https://obsproject.com/wiki/install-instructions#windows-build-directions) ensuring that your `build` folder is `build64`
 - Add this repo as a submodule inside the plugins folder: `git submodule add git@github.com:Off-World-Live/obs-spout2-source-plugin.git plugins/win-spout`
-- Download the latest [Spout Source](https://github.com/leadedge/Spout2/releases) and extract the contents of [this folder](https://github.com/leadedge/Spout2/tree/master/SpoutSDK/Source/SPOUT_LIBRARY) into a new folder `/deps/spout` inside the OBS Source code directory
-- So far I have only built this in 64bit but I see no reason why it should not work with 32bit builds.
-
+- Download [Spout.2.006](https://github.com/leadedge/Spout2/archive/refs/tags/2.006.zip) and extract the files from the directory `SpoutSDK/Source` to a new folder `deps/spout` inside the `win-spout` plugin folder
+- Edit the `CMakeLists.txt` file in `/plugins` directory and add `add_subdirectory(win-spout)` inside the `if(WIN32)` block.
+- Run `Configure`, `Generate` and then `Open Project` in the `CMake Gui`
 ### Building the windows installer
 
 - Download the latest version of [NSIS here](https://nsis.sourceforge.io/Download);
@@ -60,6 +53,7 @@ Thanks to everybody that submitted bug tickets and in particular the code contri
 
 - [@shugen002](https://github.com/shugen002)
 - [@mzlt](https://github.com/mzlt)
+- [@terids](https://github.com/terids)
 
 ## Roadmap
 
@@ -68,4 +62,4 @@ Thanks to everybody that submitted bug tickets and in particular the code contri
 
 ## License
 
-This plugin authored by Campbell Morgan is copyright Off World Live Ltd, 2019 and [licenced under the GPL V.2](./LICENCE).
+This plugin authored by Campbell Morgan is Copyright Off World Live Ltd, 2019-2021 and [licenced under the GPL V.2](./LICENCE).

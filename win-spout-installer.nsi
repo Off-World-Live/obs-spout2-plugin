@@ -2,7 +2,7 @@
 
 ; Define your application name
 !define APPNAME "Spout 2 OBS Plugin"
-!define APPVERSION "0.4"
+!define APPVERSION "0.5"
 !define APPNAMEANDVERSION "Spout 2 OBS Plugin ${APPVERSION}"
 
 ; Main Install settings
