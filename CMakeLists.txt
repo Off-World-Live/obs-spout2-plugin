@@ -9,11 +9,17 @@ if(MSVC)
 	link_directories(../../deps/spout)
 endif()
 
+set(win-spout_HEADERS
+	source/win-spout.h)
+
 set(win-spout_SOURCES
 	source/win-spout.cpp
+	source/win-spout-source.cpp)
 
 add_library(win-spout MODULE
-	${win-spout_SOURCES})
+	${win-spout_SOURCES}
+	${win-spout_HEADERS})
+
 target_link_libraries(win-spout
 	libobs)
 function(copy_spout_file targetfile)
