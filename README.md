@@ -54,10 +54,17 @@ Thanks to the authors of [SPOUT](https://github.com/leadedge/Spout2) for the lib
 
 Pull Requests welcome!
 
+## Contributors
+
+Thanks to everybody that submitted bug tickets and in particular the code contributors:
+
+- [@shugen002](https://github.com/shugen002)
+- [@mzlt](https://github.com/mzlt)
+
 ## Roadmap
 
 - [x] Improve CMakeLists.txt to copy `Spout.dll` automatically (thanks to [@shugen002](https://github.com/shugen002))
-- [ ] Check DirectX version and disable if not compatible
+- [ ] Spout Output
 
 ## License
 
