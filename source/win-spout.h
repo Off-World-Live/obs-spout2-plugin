@@ -10,7 +10,7 @@
 #ifndef WINSPOUT_H
 #define WINSPOUT_H
 
-#include "Include/SpoutLibrary.h"
+#include "SpoutLibrary.h"
 #ifdef _WIN64
 #pragma comment(lib, "Binaries/x64/SpoutLibrary.lib")
 #else

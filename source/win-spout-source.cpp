@@ -102,7 +102,7 @@ static void win_spout_source_init(void *data, bool forced = false)
 	}
 
 	if (context->useFirstSender) {
-		if (spoutptr->GetSenderName(0, context->senderName)) {
+		if (spoutptr->GetSender(0, context->senderName)) {
 			if (!spoutptr->SetActiveSender(
 				    context->senderName)) {
 				if (context->spout_status != -4) {
@@ -124,7 +124,7 @@ static void win_spout_source_init(void *data, bool forced = false)
 		bool exists = false;
 		// then get the name of each sender from SPOUT
 		for (index = 0; index < totalSenders; index++) {
-			spoutptr->GetSenderName(index, senderName);
+			spoutptr->GetSender(index, senderName);
 			if (strcmp(senderName, context->senderName) == 0) {
 				exists = true;
 				break;
@@ -397,7 +397,7 @@ static void fill_senders(obs_property_t *list)
 	char senderName[256];
 	// then get the name of each sender from SPOUT
 	for (index = 0; index < totalSenders; index++) {
-		spoutptr->GetSenderName(index, senderName);
+		spoutptr->GetSender(index, senderName);
 		obs_property_list_add_string(list, senderName, senderName);
 	}
 }
