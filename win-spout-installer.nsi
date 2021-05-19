@@ -2,7 +2,7 @@
 
 ; Define your application name
 !define APPNAME "Spout 2 OBS Plugin"
-!define APPVERSION "0.4"
+!define APPVERSION "1.0"
 !define APPNAMEANDVERSION "Spout 2 OBS Plugin ${APPVERSION}"
 
 ; Main Install settings
@@ -61,8 +61,10 @@ Section "Spout 2 OBS Plugin" Section1
 	File "..\..\build64\plugins\win-spout\Release\win-spout.dll"
 	File "..\..\build64\plugins\win-spout\Release\win-spout.exp"
 	File "..\..\build64\plugins\win-spout\Release\win-spout.lib"
-	File "..\..\deps\spout\Binaries\x64\SpoutLibrary.dll"
-	File "..\..\deps\spout\Binaries\x64\SpoutLibrary.lib"
+	File "..\..\plugins\win-spout\deps\spout\SPOUT_LIBRARY\Binaries\x64\SpoutLibrary.dll"
+	File "..\..\plugins\win-spout\deps\spout\SPOUT_LIBRARY\Binaries\x64\SpoutLibrary.lib"
+	File "..\..\plugins\win-spout\deps\spout\VS2012\Binaries\x64\Spout.dll"
+	File "..\..\plugins\win-spout\deps\spout\VS2012\Binaries\x64\Spout.lib"
 	SetOutPath "$INSTDIR\data\obs-plugins\win-spout\locale\"
 	File "data\locale\en-US.ini"
 	File "data\locale\zh-CN.ini"
@@ -111,6 +113,8 @@ Section Uninstall
 	Delete "$INSTDIR\64bit\win-spout.lib"
 	Delete "$INSTDIR\64bit\SpoutLibrary.dll"
 	Delete "$INSTDIR\64bit\SpoutLibrary.lib"
+	Delete "$INSTDIR\64bit\Spout.dll"
+	Delete "$INSTDIR\64bit\Spout.lib"
 	Delete "$INSTDIR\..\data\obs-plugins\win-spout\locale\en-US.ini"
 	Delete "$INSTDIR\..\data\obs-plugins\win-spout\locale\zh-CN.ini"
 

@@ -1,5 +1,5 @@
 /**
- * copyright Off World Live Ltd (https://offworld.live), 2019-2021
+ * Copyright Off World Live Ltd (https://offworld.live), 2019-2021
  *
  * and licenced under the GPL v2 (https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
  *
@@ -10,16 +10,10 @@
 #ifndef WINSPOUT_H
 #define WINSPOUT_H
 
-#include "SpoutLibrary.h"
-#ifdef _WIN64
-#pragma comment(lib, "Binaries/x64/SpoutLibrary.lib")
-#else
-#pragma comment(lib, "Binaries/Win32/SpoutLibrary.lib")
-#endif
-
 #define blog(log_level, message, ...) \
 	blog(log_level, "[win_spout] " message, ##__VA_ARGS__)
 
-extern SPOUTHANDLE spoutptr;
+void spout_output_start(const char* SpoutName);
+void spout_output_stop();
 
 #endif // WINSPOUT_H
