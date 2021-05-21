@@ -447,7 +447,7 @@ static obs_properties_t *win_spout_properties(void *data)
 struct obs_source_info create_spout_source_info()
 {
 	struct obs_source_info spout_source_info = {};
-	spout_source_info.id = "spout_input";
+	spout_source_info.id = "spout_capture";
 	spout_source_info.type = OBS_SOURCE_TYPE_INPUT;
 	spout_source_info.output_flags = OBS_SOURCE_VIDEO |
 					 OBS_SOURCE_CUSTOM_DRAW;
