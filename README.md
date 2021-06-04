@@ -14,7 +14,7 @@ inefficient and limited by your current screen resolution.
 
 Previously, there was no way of outputting Spout video textures from OBS. 
 
-This plugin implements the SPOUT2 SDK and creates an OBS Source from the SPOUT shared texture.
+This plugin implements the SPOUT2 SDK, creates an OBS Source from the SPOUT shared texture and a Spout output which sends the content of the OBS canvas to Spout.
 
 Please see installation and usage guide [here](http://docs.offworld.live/#/obs-spout-plugin/README?id=spout-plugin-for-obs-studio)
 
