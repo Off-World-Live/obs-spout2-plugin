@@ -65,6 +65,7 @@ Thanks to everybody that submitted bug tickets and in particular the code contri
 
 - [x] Improve CMakeLists.txt to copy `Spout.dll` automatically (thanks to [@shugen002](https://github.com/shugen002))
 - [x] Spout Output
+- [ ] Spout Filter Output
 
 ## License
 
