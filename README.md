@@ -1,7 +1,7 @@
-Spout2 Source Plugin for OBS Studio  (64bit)
+Spout2 Plugin for OBS Studio (64bit)
 =========
 
-This plugin enables the import of shared textuers at high resolution from [SPOUT2](https://github.com/leadedge/Spout2) compatible
+This plugin enables the import and export of shared textures at high resolution to and from [SPOUT2](https://github.com/leadedge/Spout2) compatible
 programs.
 
 ## Why
@@ -10,9 +10,13 @@ Previously the only way to import shared textures from SPOUT was via the DirectS
 the full-screen output of the `SpoutReceiver` program.
 
 The `SpoutCam` is limited to standard webcam resolutions and capped at `1920x1080` and capturing the SpoutReceiver is both
-inefficient and limited by your current screen resolution
+inefficient and limited by your current screen resolution.
 
-This plugin implements the SPOUT2 SDK and creates Source from the SPOUT shared texture
+Previously, there was no way of outputting Spout video textures from OBS. 
+
+This plugin implements the SPOUT2 SDK, creates an OBS Source from the SPOUT shared texture and a Spout output which sends the content of the OBS canvas to Spout.
+
+Please see installation and usage guide [here](http://docs.offworld.live/#/obs-spout-plugin/README?id=spout-plugin-for-obs-studio)
 
 ## Acknowledgements
 
@@ -31,6 +35,7 @@ Thanks to the authors of [SPOUT](https://github.com/leadedge/Spout2) for the lib
 - Select the `OBS` directory if not the default install location
 
 > N.B there are no current plans for 32bit builds, although theoretically this should be possible
+
 ## Contributing / Building
 
 - Clone the [main OBS repository](https://github.com/obsproject/obs-studio)
@@ -39,6 +44,7 @@ Thanks to the authors of [SPOUT](https://github.com/leadedge/Spout2) for the lib
 - Download [Spout.2.006](https://github.com/leadedge/Spout2/archive/refs/tags/2.006.zip) and extract the files from the directory `SpoutSDK/Source` to a new folder `deps/spout` inside the `win-spout` plugin folder
 - Edit the `CMakeLists.txt` file in `/plugins` directory and add `add_subdirectory(win-spout)` inside the `if(WIN32)` block.
 - Run `Configure`, `Generate` and then `Open Project` in the `CMake Gui`
+
 ### Building the windows installer
 
 - Download the latest version of [NSIS here](https://nsis.sourceforge.io/Download);
@@ -58,7 +64,8 @@ Thanks to everybody that submitted bug tickets and in particular the code contri
 ## Roadmap
 
 - [x] Improve CMakeLists.txt to copy `Spout.dll` automatically (thanks to [@shugen002](https://github.com/shugen002))
-- [ ] Spout Output
+- [x] Spout Output
+- [ ] Spout Filter Output
 
 ## License
 
