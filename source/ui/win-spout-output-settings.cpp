@@ -31,20 +31,27 @@ win_spout_output_settings::win_spout_output_settings(QWidget* parent)
 	ui->lineEdit_spoutname->setText(config->spout_output_name);
 
 	set_started_button_state(true);
-
 	if (config->auto_start) on_start();
+}
+
+void win_spout_output_settings::save_settings()
+{
+	win_spout_config* config = win_spout_config::get();
+	config->auto_start = ui->checkBox_auto->isChecked();
+	config->spout_output_name = ui->lineEdit_spoutname->text();
+	win_spout_config::get()->save();
 }
 
 win_spout_output_settings::~win_spout_output_settings()
 {
-	win_spout_config::get()->save(); 
+	save_settings();
 	delete ui;
 }
 
 void win_spout_output_settings::close_event(QCloseEvent* event)
 {
 	UNUSED_PARAMETER(event);
-	win_spout_config::get()->save();
+	save_settings();
 }
 
 void win_spout_output_settings::toggle_show_hide()
@@ -57,7 +64,7 @@ void win_spout_output_settings::on_start()
 {
 	QByteArray spout_output_name = ui->lineEdit_spoutname->text().toUtf8();
 	set_started_button_state(false);
-	win_spout_config::get()->save(); 
+	save_settings();
 	spout_output_start(spout_output_name);
 }
 
