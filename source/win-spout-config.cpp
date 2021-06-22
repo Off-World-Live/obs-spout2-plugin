@@ -52,6 +52,7 @@ void win_spout_config::save()
 		config_set_string(obs_config, SECTION_NAME,
 				  PARAM_SPOUT_OUTPUT_NAME,
 				  spout_output_name.toUtf8().constData());
+		config_save(obs_config);
 	}
 }
 

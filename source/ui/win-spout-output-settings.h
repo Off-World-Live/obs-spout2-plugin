@@ -29,6 +29,7 @@ private Q_SLOTS:
 
 private:
 	Ui::win_spout_output_settings* ui;
+	void save_settings();
 };
 
 #endif // WINSPOUTOUTSETTINGS_H
