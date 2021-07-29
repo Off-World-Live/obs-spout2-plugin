@@ -41,7 +41,8 @@ Thanks to the authors of [SPOUT](https://github.com/leadedge/Spout2) for the lib
 - Clone the [main OBS repository](https://github.com/obsproject/obs-studio)
 - Carefully follow their [build instructions](https://obsproject.com/wiki/install-instructions#windows-build-directions) ensuring that your `build` folder is `build64`
 - Add this repo as a submodule inside the plugins folder: `git submodule add git@github.com:Off-World-Live/obs-spout2-source-plugin.git plugins/win-spout`
-- Download [Spout.2.006](https://github.com/leadedge/Spout2/archive/refs/tags/2.006.zip) and extract the files from the directory `SpoutSDK/Source` to a new folder `deps/spout` inside the `win-spout` plugin folder
+- Clone Spout [github.com/leadedge/Spout2](https://github.com/leadedge/Spout2) to the folder `deps/Spout2` inside
+  this directory
 - Edit the `CMakeLists.txt` file in `/plugins` directory and add `add_subdirectory(win-spout)` inside the `if(WIN32)` block.
 - Run `Configure`, `Generate` and then `Open Project` in the `CMake Gui`
 
