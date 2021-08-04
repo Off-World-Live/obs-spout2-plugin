@@ -10,88 +10,51 @@
 #include <obs-module.h>
 #include <util/threading.h>
 #include "win-spout.h"
-#include "Spout.h"
+
+#include "SpoutLibrary.h"
+#include "SpoutDX.h"
+
+spoutDX sender;
 
 struct spout_output {
+
 	obs_output_t* output;
 	const char* senderName;
 	bool output_started;
-	bool spout_created;
-	int width;
-	int height;
-	HANDLE shared_sending_handle = NULL;
-	ID3D11Texture2D* sending_texture = nullptr;
 	pthread_mutex_t mutex;
-	ID3D11Device* DX11_Device = nullptr;
-	ID3D11DeviceContext* DX11_ImmediateContext = nullptr;
-	// Spout Lib Interface
-	spoutSenderNames* senderNames = nullptr;
-	spoutDirectX sdx;
-
-public:
-	void reset_info()
-	{
-		width = 0;
-		height = 0;
-	}
-
-	void reset_spout_resource()
-	{
-		if (sending_texture) {
-			sending_texture->Release();
-			sending_texture = nullptr;
-			shared_sending_handle = NULL;
-			spout_created = false;
-		}
-	}
 };
 
 bool openDX11(void* data)
 {
 	spout_output* context = (spout_output*)data;
-	if (!context->DX11_Device) {
-		blog(LOG_INFO, "OpenDX11");
-		// Create a DirectX 11 device if not already
-		context->DX11_Device = context->sdx.CreateDX11device();
-		if (!context->DX11_Device) {
-			blog(LOG_ERROR, "Failed to Open DX11");
-			return false;
-		}
-		context->DX11_Device->GetImmediateContext(&context->DX11_ImmediateContext);
-		blog(LOG_INFO, "created device (0x%.7X)", PtrToUint(context->DX11_Device));
+
+	sender.SetMaxSenders(255);
+
+	if (!sender.OpenDirectX11()) {
+		blog(LOG_ERROR, "Failed to Open DX11");
+		return false;
 	}
+	blog(LOG_INFO, "Opened DX11");
+
 	return true;
 }
 
 void closeDX11(void* data)
 {
 	spout_output* context = (spout_output*)data;
-	if (context->DX11_Device) {
-		context->DX11_Device->Release();
-		context->DX11_ImmediateContext->Release();
-	}
-
-	context->DX11_Device = nullptr;
-	context->DX11_ImmediateContext = nullptr;
+	sender.CloseDirectX11();
 }
 
 bool init_spout(void* data)
 {
 	spout_output* context = (spout_output*)data;
-	context->senderNames = new spoutSenderNames;
 	return openDX11(context);
 }
 
 void deinit_spout(void* data)
 {
 	spout_output* context = (spout_output*)data;
-	context->reset_spout_resource();
 	closeDX11(context);
-	if (context && context->senderNames)
-	{
-		delete context->senderNames;
-		context->senderNames = nullptr;
-	}
 }
 
 static const char* win_spout_output_get_name(void* unused)
@@ -114,8 +77,6 @@ static void win_spout_output_destroy(void* data)
 
 	if (context)
 	{
-		context->reset_info();
-		context->reset_spout_resource();
 		pthread_mutex_destroy(&context->mutex);
 		bfree(context);
 	}
@@ -125,9 +86,8 @@ static void* win_spout_output_create(obs_data_t* settings, obs_output_t* output)
 {
 	spout_output* context = (spout_output*)bzalloc(sizeof(spout_output));
 	context->output = output;
-	context->senderName = "";
+	context->senderName = obs_data_get_string(settings, "senderName");
 	context->output_started = false;
-	context->reset_info();
 
 	win_spout_output_update(context, settings);
 
@@ -157,29 +117,29 @@ bool win_spout_output_start(void* data)
 		return false;
 	}
 
-	context->width = (int32_t)obs_output_get_width(context->output);
-	context->height = (int32_t)obs_output_get_height(context->output);
+	sender.SetSenderName(context->senderName);
+
+	int32_t width = (int32_t)obs_output_get_width(context->output);
+	int32_t height = (int32_t)obs_output_get_height(context->output);
 
 	video_t* video = obs_output_video(context->output);
 	if (!video)
 	{
 		blog(LOG_ERROR, "Trying to start with no video!");
-		context->reset_info();
 		return false;
 	}
 
 	if (!obs_output_can_begin_data_capture(context->output, 0))
 	{
 		blog(LOG_ERROR, "Unable to begin data capture!");
-		context->reset_info();
 		return false;
 	}
 
 	video_scale_info info { };
 	// we enforce BGRA format as it works well with spout
 	info.format = VIDEO_FORMAT_BGRA;
-	info.width = context->width;
-	info.height = context->height;
+	info.width = width;
+	info.height = height;
 
 	obs_output_set_video_conversion(context->output, &info);
 
@@ -187,11 +147,10 @@ bool win_spout_output_start(void* data)
 
 	if (!context->output_started)
 	{
-		context->reset_info();
 		blog(LOG_ERROR, "Unable to start capture!");
 	}
 	else
-		blog(LOG_INFO, "Creating capture with name: %s, width: %i, height: %i", context->senderName, context->width, context->height);
+		blog(LOG_INFO, "Creating capture with name: %s, width: %i, height: %i", context->senderName, width, height);
 
 
 	return context->output_started;
@@ -208,41 +167,8 @@ void win_spout_output_stop(void* data, uint64_t ts)
 		context->output_started = false;
 
 		obs_output_end_data_capture(context->output);
-		context->senderNames->ReleaseSenderName(context->senderName);
-		context->reset_info();
-		context->reset_spout_resource();
+		sender.ReleaseSender();
 	}
-}
-
-bool create_spout_resource(spout_output* context)
-{
-	if (!context->sdx.CreateSharedDX11Texture(context->DX11_Device,
-		context->width,
-		context->height,
-		DXGI_FORMAT_B8G8R8A8_UNORM,
-		&context->sending_texture,
-		context->shared_sending_handle))
-	{
-		blog(LOG_ERROR, "Failed to create shared texture");
-		return false;
-	}
-
-	// we don't need to create it again if we are only updating texture size
-	if (!context->spout_created)
-	{
-		if (!context->senderNames->CreateSender(context->senderName,
-			context->width,
-			context->height,
-			context->shared_sending_handle,
-			DXGI_FORMAT_B8G8R8A8_UNORM))
-		{
-			blog(LOG_ERROR, "Failed while creating sender");
-			return false;
-		}
-	}
-
-	blog(LOG_INFO, "Created sender DX11 with sender name %s, Width: %i, Height: %i", context->senderName, context->width, context->height);
-	return true;
 }
 
 void win_spout_output_rawvideo(void* data, struct video_data* frame)
@@ -254,34 +180,12 @@ void win_spout_output_rawvideo(void* data, struct video_data* frame)
 		return;
 	}
 
-	if (!context->spout_created)
-	{
-		if (!create_spout_resource(context))
-		{
-			context->reset_info();
-			context->reset_spout_resource();
-			blog(LOG_ERROR, "Unable to create spout resource!");
-			return;
-		}
-		context->spout_created = true;
-	}
-
-	int32_t currentWidth = (int32_t)obs_output_get_width(context->output);
-	int32_t currentHeight = (int32_t)obs_output_get_height(context->output);
-
-	if (context->width != currentWidth || context->height != currentHeight)
-	{
-		context->width = currentWidth;
-		context->height = currentHeight;
-		context->reset_spout_resource();
-		create_spout_resource(context);
-	}
+	int32_t width = (int32_t)obs_output_get_width(context->output);
+	int32_t height = (int32_t)obs_output_get_height(context->output);
 
 	pthread_mutex_lock(&context->mutex);
-	context->DX11_ImmediateContext->UpdateSubresource(context->sending_texture, 0, NULL, frame->data[0], context->width * 4, 0);
-	context->DX11_ImmediateContext->Flush();
+	sender.SendImage(frame->data[0], width, height);
 	pthread_mutex_unlock(&context->mutex);
-	context->senderNames->UpdateSender(context->senderName, context->width, context->height, context->shared_sending_handle);
 }
 
 obs_properties_t* win_spout_output_getproperties(void* data)
