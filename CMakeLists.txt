@@ -35,6 +35,7 @@ set(win-spout_SOURCES
 	source/win-spout.cpp
 	source/win-spout-source.cpp
 	source/win-spout-output.cpp
+	source/win-spout-filter.cpp
 	source/win-spout-config.cpp
 	source/ui/win-spout-output-settings.cpp)
 
