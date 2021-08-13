@@ -11,50 +11,30 @@
 #include <util/threading.h>
 #include "win-spout.h"
 
-#include "SpoutLibrary.h"
 #include "SpoutDX.h"
 
-spoutDX sender;
-
-struct spout_output {
-
+struct spout_output
+{
+	spoutDX* sender;
 	obs_output_t* output;
 	const char* senderName;
 	bool output_started;
 	pthread_mutex_t mutex;
 };
 
-bool openDX11(void* data)
+bool init_spout(void* data)
 {
 	spout_output* context = (spout_output*)data;
 
-	sender.SetMaxSenders(255);
+	context->sender->SetMaxSenders(255);
 
-	if (!sender.OpenDirectX11()) {
+	if (!context->sender->OpenDirectX11()) {
 		blog(LOG_ERROR, "Failed to Open DX11");
 		return false;
 	}
 	blog(LOG_INFO, "Opened DX11");
 
 	return true;
-}
-
-void closeDX11(void* data)
-{
-	spout_output* context = (spout_output*)data;
-	sender.CloseDirectX11();
-}
-
-bool init_spout(void* data)
-{
-	spout_output* context = (spout_output*)data;
-	return openDX11(context);
-}
-
-void deinit_spout(void* data)
-{
-	spout_output* context = (spout_output*)data;
-	closeDX11(context);
 }
 
 static const char* win_spout_output_get_name(void* unused)
@@ -73,7 +53,8 @@ static void win_spout_output_destroy(void* data)
 {
 	spout_output* context = (spout_output*)data;
 
-	deinit_spout(context);
+	context->sender->CloseDirectX11();
+	delete context->sender;
 
 	if (context)
 	{
@@ -88,6 +69,7 @@ static void* win_spout_output_create(obs_data_t* settings, obs_output_t* output)
 	context->output = output;
 	context->senderName = obs_data_get_string(settings, "senderName");
 	context->output_started = false;
+	context->sender = new spoutDX;
 
 	win_spout_output_update(context, settings);
 
@@ -101,7 +83,8 @@ static void* win_spout_output_create(obs_data_t* settings, obs_output_t* output)
 	}
 
 	blog(LOG_ERROR, "Failed to create spout output!");
-	deinit_spout(context);
+	context->sender->CloseDirectX11();
+	delete context->sender;
 	win_spout_output_destroy(context);
 
 	return NULL;
@@ -117,7 +100,7 @@ bool win_spout_output_start(void* data)
 		return false;
 	}
 
-	sender.SetSenderName(context->senderName);
+	context->sender->SetSenderName(context->senderName);
 
 	int32_t width = (int32_t)obs_output_get_width(context->output);
 	int32_t height = (int32_t)obs_output_get_height(context->output);
@@ -135,7 +118,7 @@ bool win_spout_output_start(void* data)
 		return false;
 	}
 
-	video_scale_info info { };
+	video_scale_info info{ };
 	// we enforce BGRA format as it works well with spout
 	info.format = VIDEO_FORMAT_BGRA;
 	info.width = width;
@@ -167,7 +150,7 @@ void win_spout_output_stop(void* data, uint64_t ts)
 		context->output_started = false;
 
 		obs_output_end_data_capture(context->output);
-		sender.ReleaseSender();
+		context->sender->ReleaseSender();
 	}
 }
 
@@ -184,7 +167,7 @@ void win_spout_output_rawvideo(void* data, struct video_data* frame)
 	int32_t height = (int32_t)obs_output_get_height(context->output);
 
 	pthread_mutex_lock(&context->mutex);
-	sender.SendImage(frame->data[0], width, height);
+	context->sender->SendImage(frame->data[0], width, height);
 	pthread_mutex_unlock(&context->mutex);
 }
 
@@ -217,7 +200,7 @@ struct obs_output_info create_spout_output_info()
 	spout_output_info.stop = win_spout_output_stop;
 	spout_output_info.raw_video = win_spout_output_rawvideo;
 	spout_output_info.get_properties = win_spout_output_getproperties;
-	
+
 	return spout_output_info;
 }
 

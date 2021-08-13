@@ -27,15 +27,19 @@ struct obs_source_info spout_source_info;
 extern struct obs_output_info create_spout_output_info();
 struct obs_output_info spout_output_info;
 
+extern struct obs_source_info create_spout_filter_info();
+struct obs_source_info spout_filter_info;
+
 win_spout_output_settings* spout_output_settings;
 obs_output_t* win_spout_out;
 
 bool obs_module_load(void)
 {
-
+	// load spout - source
 	spout_source_info = create_spout_source_info();
 	obs_register_source(&spout_source_info);
 
+	// load spout output
 	QMainWindow* main_window = (QMainWindow*)obs_frontend_get_main_window();
 
 	if (!main_window) {
@@ -63,6 +67,10 @@ bool obs_module_load(void)
 
 	auto menu_cb = [] { spout_output_settings->toggle_show_hide(); };
 	menu_action->connect(menu_action, &QAction::triggered, menu_cb);
+
+	// load spout filter
+	spout_filter_info = create_spout_filter_info();
+	obs_register_source(&spout_filter_info);
 
 	blog(LOG_INFO, "win-spout loaded!");
 
