@@ -13,21 +13,22 @@
 
 #include "SpoutDX.h"
 
-spoutDX sender;
-
-struct spout_output {
-
+struct spout_output
+{
+	spoutDX* sender;
 	obs_output_t* output;
 	const char* senderName;
 	bool output_started;
 	pthread_mutex_t mutex;
 };
 
-bool init_spout()
+bool init_spout(void* data)
 {
-	sender.SetMaxSenders(255);
+	spout_output* context = (spout_output*)data;
 
-	if (!sender.OpenDirectX11()) {
+	context->sender->SetMaxSenders(255);
+
+	if (!context->sender->OpenDirectX11()) {
 		blog(LOG_ERROR, "Failed to Open DX11");
 		return false;
 	}
@@ -52,7 +53,8 @@ static void win_spout_output_destroy(void* data)
 {
 	spout_output* context = (spout_output*)data;
 
-	sender.CloseDirectX11();
+	context->sender->CloseDirectX11();
+	delete context->sender;
 
 	if (context)
 	{
@@ -67,10 +69,11 @@ static void* win_spout_output_create(obs_data_t* settings, obs_output_t* output)
 	context->output = output;
 	context->senderName = obs_data_get_string(settings, "senderName");
 	context->output_started = false;
+	context->sender = new spoutDX;
 
 	win_spout_output_update(context, settings);
 
-	if (init_spout())
+	if (init_spout(context))
 	{
 		pthread_mutex_init_value(&context->mutex);
 		if (pthread_mutex_init(&context->mutex, NULL) == 0) {
@@ -80,7 +83,8 @@ static void* win_spout_output_create(obs_data_t* settings, obs_output_t* output)
 	}
 
 	blog(LOG_ERROR, "Failed to create spout output!");
-	sender.CloseDirectX11();
+	context->sender->CloseDirectX11();
+	delete context->sender;
 	win_spout_output_destroy(context);
 
 	return NULL;
@@ -96,7 +100,7 @@ bool win_spout_output_start(void* data)
 		return false;
 	}
 
-	sender.SetSenderName(context->senderName);
+	context->sender->SetSenderName(context->senderName);
 
 	int32_t width = (int32_t)obs_output_get_width(context->output);
 	int32_t height = (int32_t)obs_output_get_height(context->output);
@@ -146,7 +150,7 @@ void win_spout_output_stop(void* data, uint64_t ts)
 		context->output_started = false;
 
 		obs_output_end_data_capture(context->output);
-		sender.ReleaseSender();
+		context->sender->ReleaseSender();
 	}
 }
 
@@ -163,7 +167,7 @@ void win_spout_output_rawvideo(void* data, struct video_data* frame)
 	int32_t height = (int32_t)obs_output_get_height(context->output);
 
 	pthread_mutex_lock(&context->mutex);
-	sender.SendImage(frame->data[0], width, height);
+	context->sender->SendImage(frame->data[0], width, height);
 	pthread_mutex_unlock(&context->mutex);
 }
 
