@@ -16,10 +16,11 @@
 
 #define FILTER_PROP_NAME "spout_filter_name"
 
-spoutDX filter_sender;
+
 
 struct win_spout_filter
 {
+	spoutDX* filter_sender;
 	obs_source_t* source_context;
 	const char* sender_name;
 	pthread_mutex_t mutex;
@@ -33,10 +34,11 @@ struct win_spout_filter
 	obs_video_info video_info;
 };
 
-bool openDX11()
+bool openDX11(void* data)
 {
-	filter_sender.SetMaxSenders(255);
-	if (!filter_sender.OpenDirectX11())
+	struct win_spout_filter* context = (win_spout_filter*)data;
+	context->filter_sender->SetMaxSenders(255);
+	if (!context->filter_sender->OpenDirectX11())
 	{
 		blog(LOG_ERROR, "Failed to Open DX11");
 		return false;
@@ -85,7 +87,7 @@ void win_spout_filter_raw_video(void* data, video_data* frame)
 	if (!frame|| !frame->data[0]) return;
 
 	pthread_mutex_lock(&context->mutex);
-	filter_sender.SendImage(frame->data[0], context->width, context->height);
+	context->filter_sender->SendImage(frame->data[0], context->width, context->height);
 	pthread_mutex_unlock(&context->mutex);
 }
 
@@ -181,9 +183,9 @@ void win_spout_filter_update(void* data, obs_data_t* settings)
 	struct win_spout_filter* context = (win_spout_filter*)data;
 
 	obs_remove_main_render_callback(win_spout_offscreen_render, context);
-	filter_sender.ReleaseSender();
+	context->filter_sender->ReleaseSender();
 	context->sender_name = obs_data_get_string(settings, FILTER_PROP_NAME);
-	filter_sender.SetSenderName(context->sender_name);
+	context->filter_sender->SetSenderName(context->sender_name);
 	obs_add_main_render_callback(win_spout_offscreen_render, context);
 }
 
@@ -196,10 +198,14 @@ void* win_spout_filter_create(obs_data_t* settings, obs_source_t* source)
 	context->sender_name = obs_data_get_string(settings, FILTER_PROP_NAME);
 	context->video_data = nullptr;
 
+	context->filter_sender = new spoutDX;
+
 	obs_get_video_info(&context->video_info);
 	win_spout_filter_update(context, settings);
 
-	if (openDX11())
+	
+
+	if (openDX11(context))
 	{
 		pthread_mutex_init_value(&context->mutex);
 		if (pthread_mutex_init(&context->mutex, NULL) == 0)
@@ -209,7 +215,8 @@ void* win_spout_filter_create(obs_data_t* settings, obs_source_t* source)
 	}
 
 	blog(LOG_ERROR, "Failed to create spout output!");
-	filter_sender.CloseDirectX11();
+	context->filter_sender->CloseDirectX11();
+	delete context->filter_sender;
 	return context;
 }
 
@@ -217,8 +224,9 @@ void win_spout_filter_destroy(void* data)
 {
 	struct win_spout_filter* context = (win_spout_filter*)data;
 
-	filter_sender.ReleaseSender();
-	filter_sender.CloseDirectX11();
+	context->filter_sender->ReleaseSender();
+	context->filter_sender->CloseDirectX11();
+	delete context->filter_sender;
 
 	if (context)
 	{
