@@ -11,7 +11,6 @@
 #include <util/threading.h>
 #include "win-spout.h"
 
-#include "SpoutLibrary.h"
 #include "SpoutDX.h"
 
 spoutDX sender;
@@ -24,10 +23,8 @@ struct spout_output {
 	pthread_mutex_t mutex;
 };
 
-bool openDX11(void* data)
+bool init_spout()
 {
-	spout_output* context = (spout_output*)data;
-
 	sender.SetMaxSenders(255);
 
 	if (!sender.OpenDirectX11()) {
@@ -37,24 +34,6 @@ bool openDX11(void* data)
 	blog(LOG_INFO, "Opened DX11");
 
 	return true;
-}
-
-void closeDX11(void* data)
-{
-	spout_output* context = (spout_output*)data;
-	sender.CloseDirectX11();
-}
-
-bool init_spout(void* data)
-{
-	spout_output* context = (spout_output*)data;
-	return openDX11(context);
-}
-
-void deinit_spout(void* data)
-{
-	spout_output* context = (spout_output*)data;
-	closeDX11(context);
 }
 
 static const char* win_spout_output_get_name(void* unused)
@@ -73,7 +52,7 @@ static void win_spout_output_destroy(void* data)
 {
 	spout_output* context = (spout_output*)data;
 
-	deinit_spout(context);
+	sender.CloseDirectX11();
 
 	if (context)
 	{
@@ -91,7 +70,7 @@ static void* win_spout_output_create(obs_data_t* settings, obs_output_t* output)
 
 	win_spout_output_update(context, settings);
 
-	if (init_spout(context))
+	if (init_spout())
 	{
 		pthread_mutex_init_value(&context->mutex);
 		if (pthread_mutex_init(&context->mutex, NULL) == 0) {
@@ -101,7 +80,7 @@ static void* win_spout_output_create(obs_data_t* settings, obs_output_t* output)
 	}
 
 	blog(LOG_ERROR, "Failed to create spout output!");
-	deinit_spout(context);
+	sender.CloseDirectX11();
 	win_spout_output_destroy(context);
 
 	return NULL;
@@ -135,7 +114,7 @@ bool win_spout_output_start(void* data)
 		return false;
 	}
 
-	video_scale_info info { };
+	video_scale_info info{ };
 	// we enforce BGRA format as it works well with spout
 	info.format = VIDEO_FORMAT_BGRA;
 	info.width = width;
@@ -217,7 +196,7 @@ struct obs_output_info create_spout_output_info()
 	spout_output_info.stop = win_spout_output_stop;
 	spout_output_info.raw_video = win_spout_output_rawvideo;
 	spout_output_info.get_properties = win_spout_output_getproperties;
-	
+
 	return spout_output_info;
 }
 
