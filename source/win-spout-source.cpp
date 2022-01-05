@@ -43,7 +43,6 @@ struct spout_source {
 	int width;
 	int height;
 	bool initialized;
-	bool active;
 	ULONGLONG tick_speed_limit;
 	ULONGLONG composite_mode;
 	int spout_status;
@@ -218,7 +217,6 @@ static void *win_spout_source_create(obs_data_t *settings, obs_source_t *source)
 	context->tick_speed_limit = 0;
 	context->texture = NULL;
 	context->dxHandle = NULL;
-	context->active = false;
 	context->initialized = false;
 
 	// set the initial size as 100x100 until we
@@ -276,28 +274,20 @@ static void win_spout_source_render(void *data, gs_effect_t *effect)
 {
 	struct spout_source *context = (spout_source *)data;
 
-	if (!context->active) {
+	// tried to initialise again
+	// but failed, so we exit
+	if (!context->initialized) {
 		if (context->render_status != -1) {
-			debug("inactive");
+			debug("uninit'd");
 			context->render_status = -1;
 		}
 		return;
 	}
 
-	// tried to initialise again
-	// but failed, so we exit
-	if (!context->initialized) {
-		if (context->render_status != -2) {
-			debug("uninit'd");
-			context->render_status = -2;
-		}
-		return;
-	}
-
 	if (!context->texture) {
-		if (context->render_status != -3) {
+		if (context->render_status != -2) {
 			debug("no texture");
-			context->render_status = -3;
+			context->render_status = -2;
 		}
 		return;
 	}
@@ -357,7 +347,6 @@ static void win_spout_source_tick(void *data, float seconds)
 
 	struct spout_source *context = (spout_source *)data;
 
-	context->active = obs_source_active(context->source);
 	if (win_spout_sender_has_changed(context)) {
 		if (context->tick_status != -1) {
 			info("Sender %s has changed / gone away. Resetting ",
