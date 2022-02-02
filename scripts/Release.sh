@@ -14,7 +14,7 @@ SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 OBS_ROOT_DIR="$SCRIPTS_DIR/../../.."
 
 echo ""
-echo "*** Build Plugin for Release ***"
+echo "*** Build Plugin for Release -- Root Dir $OBS_ROOT_DIR ***"
 echo ""
 
 MSBUILD_PATH="c:/Program Files (x86)/Microsoft Visual Studio/2019/Community/MSBuild/Current/Bin/MSBuild.exe"
@@ -34,20 +34,20 @@ if [ "$(ls -A "$MANUAL_INSTALL_PLUGIN_DIR")" ]; then
      rm -r -f "$MANUAL_INSTALL_PLUGIN_DIR"/*
 fi
 
-MANUAL_INSTALL_BIN_DIR="$MANUAL_INSTALL_PLUGIN_DIR/Bin"
-mkdir -p "$MANUAL_INSTALL_BIN_DIR";
+MANUAL_INSTALL_PLUGIN_OUTPUT_DIR="$MANUAL_INSTALL_PLUGIN_DIR/obs-plugins/64bit"
+mkdir -p "$MANUAL_INSTALL_PLUGIN_OUTPUT_DIR";
 
 OBS_RELEASE_BIN_DIR="$OBS_ROOT_DIR/build64/rundir/Release/obs-plugins/64bit"
 
-cp "$OBS_RELEASE_BIN_DIR/win-spout.dll" "$MANUAL_INSTALL_BIN_DIR"
-cp "$OBS_RELEASE_BIN_DIR/Spout.dll" "$MANUAL_INSTALL_BIN_DIR"
-cp "$OBS_RELEASE_BIN_DIR/SpoutDX.dll" "$MANUAL_INSTALL_BIN_DIR"
-cp "$OBS_RELEASE_BIN_DIR/SpoutLibrary.dll" "$MANUAL_INSTALL_BIN_DIR"
+cp "$OBS_RELEASE_BIN_DIR/win-spout.dll" "$MANUAL_INSTALL_PLUGIN_OUTPUT_DIR"
+cp "$OBS_RELEASE_BIN_DIR/Spout.dll" "$MANUAL_INSTALL_PLUGIN_OUTPUT_DIR"
+cp "$OBS_RELEASE_BIN_DIR/SpoutDX.dll" "$MANUAL_INSTALL_PLUGIN_OUTPUT_DIR"
+cp "$OBS_RELEASE_BIN_DIR/SpoutLibrary.dll" "$MANUAL_INSTALL_PLUGIN_OUTPUT_DIR"
 
-MANUAL_INSTALL_DATA_DIR="$MANUAL_INSTALL_PLUGIN_DIR/Data"
+MANUAL_INSTALL_DATA_DIR="$MANUAL_INSTALL_PLUGIN_DIR/data/obs-plugins"
 mkdir -p "$MANUAL_INSTALL_DATA_DIR";
 
-OBS_RELEASE_DATA_DIR="$OBS_ROOT_DIR/build64/rundir/Release/data/obs-plugins/win-spout/locale"
+OBS_RELEASE_DATA_DIR="$OBS_ROOT_DIR/build64/rundir/Release/data/obs-plugins/win-spout"
 
 cp -R "$OBS_RELEASE_DATA_DIR" "$MANUAL_INSTALL_DATA_DIR"
 

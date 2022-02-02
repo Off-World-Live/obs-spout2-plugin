@@ -32,3 +32,4 @@
 *.app
 
 deps
+manual-install-*
