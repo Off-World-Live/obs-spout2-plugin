@@ -31,6 +31,7 @@
 #define COMPOSITE_MODE_OPAQUE 1
 #define COMPOSITE_MODE_ALPHA 2
 #define COMPOSITE_MODE_DEFAULT 3
+#define COMPOSITE_MODE_PREMULTIPLIED 4
 
 struct spout_source {
 	obs_source_t *source;
@@ -302,7 +303,13 @@ static void win_spout_source_render(void *data, gs_effect_t *effect)
 		effect = obs_get_base_effect(OBS_EFFECT_OPAQUE);
 		break;
 	case COMPOSITE_MODE_ALPHA:
-		effect = obs_get_base_effect(OBS_EFFECT_PREMULTIPLIED_ALPHA);
+		effect = obs_get_base_effect(OBS_EFFECT_PREMULTIPLIED_ALPHA); // Converts premultiplied to regular alpha before blending it as regular transparency.
+		break;
+	case COMPOSITE_MODE_PREMULTIPLIED:
+		effect = obs_get_base_effect(OBS_EFFECT_DEFAULT);
+		// Proper blending of premultiplied alpha needs a modified blend function and then works with the default blending effect.
+		gs_blend_state_push();
+		gs_blend_function(GS_BLEND_ONE, GS_BLEND_INVSRCALPHA);
 		break;
 	case COMPOSITE_MODE_DEFAULT:
 		effect = obs_get_base_effect(OBS_EFFECT_DEFAULT);
@@ -314,6 +321,10 @@ static void win_spout_source_render(void *data, gs_effect_t *effect)
 
 	while (gs_effect_loop(effect, "Draw")) {
 		obs_source_draw(context->texture, 0, 0, 0, 0, false);
+	}
+
+	if (context->composite_mode == COMPOSITE_MODE_PREMULTIPLIED) {
+		gs_blend_state_pop();
 	}
 }
 
@@ -416,6 +427,9 @@ static obs_properties_t *win_spout_properties(void *data)
 	obs_property_list_add_int(composite_mode_list,
 				  obs_module_text("compositemodedefault"),
 				  COMPOSITE_MODE_DEFAULT);
+	obs_property_list_add_int(composite_mode_list,
+				  obs_module_text("compositemodepremultiplied"),
+				  COMPOSITE_MODE_PREMULTIPLIED);
 
 	obs_property_t *tick_speed_limit_list = obs_properties_add_list(
 		props, SPOUT_TICK_SPEED_LIMIT,
