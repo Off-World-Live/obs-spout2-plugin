@@ -33,3 +33,5 @@
 
 deps
 manual-install-*
+*.zip
+win-spout-installer.versioned.nsi

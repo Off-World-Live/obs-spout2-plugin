@@ -17,7 +17,8 @@ echo ""
 echo "*** Build Plugin for Release -- Root Dir $OBS_ROOT_DIR ***"
 echo ""
 
-MSBUILD_PATH="c:/Program Files (x86)/Microsoft Visual Studio/2019/Community/MSBuild/Current/Bin/MSBuild.exe"
+MSBUILD_PATH="C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe"
+SEVENZIP_PATH="C:/Program Files/7-Zip/7z.exe"
 SOLUTION="$OBS_ROOT_DIR/build64/plugins/win-spout/win-spout.sln"
 BUILD_ARGS="/target:Rebuild /property:Configuration=Release /maxcpucount:8 /verbosity:quiet /consoleloggerparameters:Summary;ErrorsOnly;WarningsOnly"
 
@@ -57,11 +58,21 @@ echo ""
 
 NSI_FILE="$SCRIPTS_DIR/../win-spout-installer.nsi"
 
-sed -i 's/^!define APPVERSION .*$/!define APPVERSION "'$VERSION'"/' $NSI_FILE
+NSI_COPIED="$SCRIPTS_DIR/../win-spout-installer.versioned.nsi"
+cp $NSI_FILE $NSI_COPIED
+sed -i 's/^!define APPVERSION .*$/!define APPVERSION "'$VERSION'"/' $NSI_COPIED
 
 MAKENSIS_PATH="c:/Program Files (x86)/NSIS/makensis.exe"
 
-"$MAKENSIS_PATH" $NSI_FILE
+"$MAKENSIS_PATH" $NSI_COPIED
+
+echo ""
+echo "*** Generating Manual Install Zip file ***"
+
+ZIPFILE="$SCRIPTS_DIR/../OBS_Spout2_Plugin_ManualInstall_v$VERSION.zip"
+cd "$MANUAL_INSTALL_PLUGIN_DIR"
+"$SEVENZIP_PATH" a -tZIP "$ZIPFILE" "./*"
+cd -
 
 echo ""
 echo "*** Release Finished ***"
