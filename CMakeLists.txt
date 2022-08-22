@@ -17,8 +17,7 @@ set(OBS_FRONTEND_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/UI/obs-frontend-api")
 set(OBS_FRONTEND_LIB "${CMAKE_BINARY_DIR}/UI/obs-frontend-api/$<CONFIGURATION>/obs-frontend-api.lib")
 set(PTHREAD_LIB "${CMAKE_BINARY_DIR}/deps/w32-pthreads/$<CONFIGURATION>/w32-pthreads.lib")
 
-find_package(Qt5Core REQUIRED)
-find_package(Qt5Widgets REQUIRED)
+find_qt(COMPONENTS Core Widgets)
 
 if(MSVC)
 	include_directories(deps/Spout2/SPOUTSDK/SpoutLibrary)
@@ -43,6 +42,7 @@ add_library(win-spout MODULE
 	${win-spout_SOURCES}
 	${win-spout_HEADERS})
 
+
 include_directories(
 	${OBS_FRONTEND_INCLUDE_DIR}
 	${LIBOBS_INCLUDE_DIR}
@@ -56,9 +56,10 @@ target_link_libraries(win-spout
 	${OBS_FRONTEND_LIB}
 	${PTHREAD_LIB}
 	${LIBOBS_LIB}
-	Qt5::Core
-	Qt5::Widgets
-	${SPOUTDX_LIB})
+	${SPOUTDX_LIB}
+	Qt::Core
+	Qt::Widgets
+	)
 
 function(copy_spout_file)
 	if(CMAKE_SIZEOF_VOID_P EQUAL 8)
@@ -103,6 +104,6 @@ function(copy_spout_file)
 	)
 endfunction()
 
-install_obs_plugin_with_data(win-spout data)
+setup_plugin_target(win-spout)
 copy_spout_file()
 

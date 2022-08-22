@@ -155,7 +155,7 @@ static void win_spout_source_init(void *data, bool forced = false)
 
 	obs_enter_graphics();
 	gs_texture_destroy(context->texture);
-	context->texture = gs_texture_open_shared((uint32_t)context->dxHandle);
+	context->texture = gs_texture_open_shared((uint32_t)(uintptr_t)context->dxHandle);
 	obs_leave_graphics();
 
 	context->initialized = true;

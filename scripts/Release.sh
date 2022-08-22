@@ -17,7 +17,7 @@ echo ""
 echo "*** Build Plugin for Release -- Root Dir $OBS_ROOT_DIR ***"
 echo ""
 
-MSBUILD_PATH="c:/Program Files (x86)/Microsoft Visual Studio/2019/Community/MSBuild/Current/Bin/MSBuild.exe"
+MSBUILD_PATH="C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe"
 SOLUTION="$OBS_ROOT_DIR/build64/plugins/win-spout/win-spout.sln"
 BUILD_ARGS="/target:Rebuild /property:Configuration=Release /maxcpucount:8 /verbosity:quiet /consoleloggerparameters:Summary;ErrorsOnly;WarningsOnly"
 
