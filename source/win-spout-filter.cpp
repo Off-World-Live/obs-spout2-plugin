@@ -23,7 +23,6 @@ struct win_spout_filter
 	spoutDX* filter_sender;
 	obs_source_t* source_context;
 	const char* sender_name;
-	pthread_mutex_t mutex;
 	uint32_t width;
 	uint32_t height;
 	gs_texrender_t* texrender;
@@ -80,17 +79,6 @@ void win_spout_filter_getdefaults(obs_data_t* defaults)
 		obs_module_text("defaultfiltername"));
 }
 
-void win_spout_filter_raw_video(void* data, video_data* frame)
-{
-	struct win_spout_filter* context = (win_spout_filter*)data;
-
-	if (!frame|| !frame->data[0]) return;
-
-	pthread_mutex_lock(&context->mutex);
-	context->filter_sender->SendImage(frame->data[0], context->width, context->height);
-	pthread_mutex_unlock(&context->mutex);
-}
-
 void win_spout_offscreen_render(void* data, uint32_t cx, uint32_t cy)
 {
 	
@@ -117,63 +105,25 @@ void win_spout_offscreen_render(void* data, uint32_t cx, uint32_t cy)
 		gs_blend_state_push();
 		gs_blend_function(GS_BLEND_ONE, GS_BLEND_ZERO);
 
+		// Colours are wrong with this set to either value...
+		// const bool previous = gs_set_linear_srgb(false);
+
 		obs_source_video_render(target);
+
+		// gs_set_linear_srgb(previous);
 
 		gs_blend_state_pop();
 		gs_texrender_end(context->texrender);
 
-		if (context->width != width || context->height != height)
-		{
+		// A flush is necessary to get the rendered texture.
+		// Is this expensive at this point in the rendering?
+		// We're already in a hook quite far into the render.
+		// Could also double-buffer and call SendTexture on the texrender from the prev frame.
+		gs_flush();
 
-			gs_stagesurface_destroy(context->stagesurface);
-			context->stagesurface = gs_stagesurface_create(width, height, GS_BGRA);
-
-			video_output_info video_out = { 0 };
-			video_out.format = VIDEO_FORMAT_BGRA;
-			video_out.width = width;
-			video_out.height = height;
-			video_out.fps_den = context->video_info.fps_den;
-			video_out.fps_num = context->video_info.fps_num;
-			video_out.cache_size = 16;
-			video_out.colorspace = VIDEO_CS_DEFAULT;
-			video_out.range = VIDEO_RANGE_DEFAULT;
-			video_out.name = obs_source_get_name(context->source_context);
-
-			video_output_close(context->video_output);
-
-			context->width = width;
-			context->height = height;
-			video_output_open(&context->video_output, &video_out);
-			video_output_connect(context->video_output, nullptr, win_spout_filter_raw_video, context);
-
-
-		}
-
-		struct video_frame output_frame;
-		if (video_output_lock_frame(context->video_output,
-			&output_frame, 1, obs_get_video_frame_time()))
-		{
-			if (context->video_data) {
-				gs_stagesurface_unmap(context->stagesurface);
-				context->video_data = nullptr;
-			}
-
-			gs_stage_texture(context->stagesurface,
-				gs_texrender_get_texture(context->texrender));
-			gs_stagesurface_map(context->stagesurface,
-				&context->video_data, &context->video_linesize);
-
-			uint32_t linesize = output_frame.linesize[0];
-			for (uint32_t i = 0; i < context->height; ++i) {
-				uint32_t dst_offset = linesize * i;
-				uint32_t src_offset = context->video_linesize * i;
-				memcpy(output_frame.data[0] + dst_offset,
-					context->video_data + src_offset,
-					linesize);
-			}
-
-			video_output_unlock_frame(context->video_output);
-		}
+		context->filter_sender->SendTexture(
+			(ID3D11Texture2D*)gs_texture_get_obj(
+				gs_texrender_get_texture(context->texrender)));
 	}
 }
 
@@ -194,7 +144,8 @@ void* win_spout_filter_create(obs_data_t* settings, obs_source_t* source)
 	struct win_spout_filter* context = (win_spout_filter*)bzalloc(sizeof(win_spout_filter));
 
 	context->source_context = source;
-	context->texrender = gs_texrender_create(GS_BGRA, GS_ZS_NONE);
+	// Use a Spout-compatible texture format
+	context->texrender = gs_texrender_create(GS_BGRA_UNORM, GS_ZS_NONE);
 	context->sender_name = obs_data_get_string(settings, FILTER_PROP_NAME);
 	context->video_data = nullptr;
 
@@ -207,11 +158,7 @@ void* win_spout_filter_create(obs_data_t* settings, obs_source_t* source)
 
 	if (openDX11(context))
 	{
-		pthread_mutex_init_value(&context->mutex);
-		if (pthread_mutex_init(&context->mutex, NULL) == 0)
-		{
-			return context;
-		}
+		return context;
 	}
 
 	blog(LOG_ERROR, "Failed to create spout output!");
@@ -235,7 +182,6 @@ void win_spout_filter_destroy(void* data)
 		gs_stagesurface_unmap(context->stagesurface);
 		gs_stagesurface_destroy(context->stagesurface);
 		gs_texrender_destroy(context->texrender);
-		pthread_mutex_destroy(&context->mutex);
 		bfree(context);
 	}
 }
