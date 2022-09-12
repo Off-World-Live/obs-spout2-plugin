@@ -25,7 +25,8 @@ struct win_spout_filter
 	const char* sender_name;
 	uint32_t width;
 	uint32_t height;
-	gs_texrender_t* texrender;
+	gs_texrender_t* texrender_curr;
+	gs_texrender_t* texrender_prev;
 	gs_stagesurf_t* stagesurface;
 	video_t* video_output;
 	uint8_t* video_data;
@@ -92,9 +93,9 @@ void win_spout_offscreen_render(void* data, uint32_t cx, uint32_t cy)
 	uint32_t width = obs_source_get_base_width(target);
 	uint32_t height = obs_source_get_base_height(target);
 
-	gs_texrender_reset(context->texrender);
+	gs_texrender_reset(context->texrender_curr);
 
-	if (gs_texrender_begin(context->texrender, width, height))
+	if (gs_texrender_begin(context->texrender_curr, width, height))
 	{
 		struct vec4 background;
 		vec4_zero(&background);
@@ -113,17 +114,21 @@ void win_spout_offscreen_render(void* data, uint32_t cx, uint32_t cy)
 		// gs_set_linear_srgb(previous);
 
 		gs_blend_state_pop();
-		gs_texrender_end(context->texrender);
+		gs_texrender_end(context->texrender_curr);
 
-		// A flush is necessary to get the rendered texture.
-		// Is this expensive at this point in the rendering?
-		// We're already in a hook quite far into the render.
-		// Could also double-buffer and call SendTexture on the texrender from the prev frame.
-		gs_flush();
+		gs_texture_t *prev_tex =
+			gs_texrender_get_texture(context->texrender_prev);
+		if (prev_tex) {
+			context->filter_sender->SendTexture((
+				ID3D11Texture2D *)gs_texture_get_obj(prev_tex));
+		}
 
-		context->filter_sender->SendTexture(
-			(ID3D11Texture2D*)gs_texture_get_obj(
-				gs_texrender_get_texture(context->texrender)));
+		// Swap the buffers
+		// Double-buffering avoids the need for a flush, and also fixes
+		// some issues related to G-Sync.
+		gs_texrender_t *tmp = context->texrender_curr;
+		context->texrender_curr = context->texrender_prev;
+		context->texrender_prev = tmp;
 	}
 }
 
@@ -145,7 +150,8 @@ void* win_spout_filter_create(obs_data_t* settings, obs_source_t* source)
 
 	context->source_context = source;
 	// Use a Spout-compatible texture format
-	context->texrender = gs_texrender_create(GS_BGRA_UNORM, GS_ZS_NONE);
+	context->texrender_curr = gs_texrender_create(GS_BGRA_UNORM, GS_ZS_NONE);
+	context->texrender_prev = gs_texrender_create(GS_BGRA_UNORM, GS_ZS_NONE);
 	context->sender_name = obs_data_get_string(settings, FILTER_PROP_NAME);
 	context->video_data = nullptr;
 
@@ -181,7 +187,8 @@ void win_spout_filter_destroy(void* data)
 		video_output_close(context->video_output);
 		gs_stagesurface_unmap(context->stagesurface);
 		gs_stagesurface_destroy(context->stagesurface);
-		gs_texrender_destroy(context->texrender);
+		gs_texrender_destroy(context->texrender_prev);
+		gs_texrender_destroy(context->texrender_curr);
 		bfree(context);
 	}
 }
@@ -205,7 +212,7 @@ struct obs_source_info create_spout_filter_info()
 	struct obs_source_info win_spout_filter_info = {};
 	win_spout_filter_info.id = "win_spout_filter";
 	win_spout_filter_info.type = OBS_SOURCE_TYPE_FILTER;
-	win_spout_filter_info.output_flags = OBS_SOURCE_VIDEO;
+	win_spout_filter_info.output_flags = OBS_SOURCE_VIDEO;// | OBS_SOURCE_SRGB;
 	win_spout_filter_info.get_name = win_spout_filter_getname;
 	win_spout_filter_info.get_properties = win_spout_filter_getproperties;
 	win_spout_filter_info.get_defaults = win_spout_filter_getdefaults;
