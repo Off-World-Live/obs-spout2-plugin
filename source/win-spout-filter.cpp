@@ -27,6 +27,7 @@ struct win_spout_filter
 	uint32_t height;
 	gs_texrender_t* texrender_curr;
 	gs_texrender_t* texrender_prev;
+	gs_texrender_t* texrender_intermediate;
 	gs_stagesurf_t* stagesurface;
 	video_t* video_output;
 	uint8_t* video_data;
@@ -93,8 +94,27 @@ void win_spout_offscreen_render(void* data, uint32_t cx, uint32_t cy)
 	uint32_t width = obs_source_get_base_width(target);
 	uint32_t height = obs_source_get_base_height(target);
 
-	gs_texrender_reset(context->texrender_curr);
+	// Render the target to an intemediate format in sRGB-aware format
+	gs_texrender_reset(context->texrender_intermediate);
+	if (gs_texrender_begin(context->texrender_intermediate, width, height)) {
+		struct vec4 background;
+		vec4_zero(&background);
 
+		gs_clear(GS_CLEAR_COLOR, &background, 0.0f, 0);
+		gs_ortho(0.0f, (float)width, 0.0f, (float)height, -100.0f,
+			 100.0f);
+
+		gs_blend_state_push();
+		gs_blend_function(GS_BLEND_ONE, GS_BLEND_ZERO);
+
+		obs_source_video_render(target);
+
+		gs_blend_state_pop();
+		gs_texrender_end(context->texrender_intermediate);
+	}
+
+	// Use the default effect to render it back into a format Spout accepts
+	gs_texrender_reset(context->texrender_curr);
 	if (gs_texrender_begin(context->texrender_curr, width, height))
 	{
 		struct vec4 background;
@@ -106,10 +126,31 @@ void win_spout_offscreen_render(void* data, uint32_t cx, uint32_t cy)
 		gs_blend_state_push();
 		gs_blend_function(GS_BLEND_ONE, GS_BLEND_ZERO);
 
-		// Colours are wrong with this set to either value...
 		// const bool previous = gs_set_linear_srgb(false);
 
-		obs_source_video_render(target);
+		// obs_source_video_render(target);
+
+		// To get sRGB handling, render with the default effect
+		gs_effect_t *effect = obs_get_base_effect(OBS_EFFECT_DEFAULT);
+		gs_texture_t *tex = gs_texrender_get_texture(context->texrender_intermediate);
+		if (tex) {
+			const bool linear_srgb = gs_get_linear_srgb();
+
+			const bool previous = gs_framebuffer_srgb_enabled();
+			gs_enable_framebuffer_srgb(linear_srgb); // if it works, maybe this is all that was needed?
+
+			gs_eparam_t *image =
+				gs_effect_get_param_by_name(effect, "image");
+			if (linear_srgb)
+				gs_effect_set_texture_srgb(image, tex);
+			else
+				gs_effect_set_texture(image, tex);
+
+			while (gs_effect_loop(effect, "Draw"))
+				gs_draw_sprite(tex, 0, width, height); // Why are there multiple passes on the default effect anyway?
+
+			gs_enable_framebuffer_srgb(previous);
+		}
 
 		// gs_set_linear_srgb(previous);
 
@@ -152,6 +193,8 @@ void* win_spout_filter_create(obs_data_t* settings, obs_source_t* source)
 	// Use a Spout-compatible texture format
 	context->texrender_curr = gs_texrender_create(GS_BGRA_UNORM, GS_ZS_NONE);
 	context->texrender_prev = gs_texrender_create(GS_BGRA_UNORM, GS_ZS_NONE);
+	context->texrender_intermediate =
+		gs_texrender_create(GS_BGRA, GS_ZS_NONE);
 	context->sender_name = obs_data_get_string(settings, FILTER_PROP_NAME);
 	context->video_data = nullptr;
 
@@ -187,6 +230,7 @@ void win_spout_filter_destroy(void* data)
 		video_output_close(context->video_output);
 		gs_stagesurface_unmap(context->stagesurface);
 		gs_stagesurface_destroy(context->stagesurface);
+		gs_texrender_destroy(context->texrender_intermediate);
 		gs_texrender_destroy(context->texrender_prev);
 		gs_texrender_destroy(context->texrender_curr);
 		bfree(context);
@@ -212,7 +256,7 @@ struct obs_source_info create_spout_filter_info()
 	struct obs_source_info win_spout_filter_info = {};
 	win_spout_filter_info.id = "win_spout_filter";
 	win_spout_filter_info.type = OBS_SOURCE_TYPE_FILTER;
-	win_spout_filter_info.output_flags = OBS_SOURCE_VIDEO;// | OBS_SOURCE_SRGB;
+	win_spout_filter_info.output_flags = OBS_SOURCE_VIDEO | OBS_SOURCE_SRGB;
 	win_spout_filter_info.get_name = win_spout_filter_getname;
 	win_spout_filter_info.get_properties = win_spout_filter_getproperties;
 	win_spout_filter_info.get_defaults = win_spout_filter_getdefaults;
