@@ -126,10 +126,6 @@ void win_spout_offscreen_render(void* data, uint32_t cx, uint32_t cy)
 		gs_blend_state_push();
 		gs_blend_function(GS_BLEND_ONE, GS_BLEND_ZERO);
 
-		// const bool previous = gs_set_linear_srgb(false);
-
-		// obs_source_video_render(target);
-
 		// To get sRGB handling, render with the default effect
 		gs_effect_t *effect = obs_get_base_effect(OBS_EFFECT_DEFAULT);
 		gs_texture_t *tex = gs_texrender_get_texture(context->texrender_intermediate);
@@ -137,7 +133,7 @@ void win_spout_offscreen_render(void* data, uint32_t cx, uint32_t cy)
 			const bool linear_srgb = gs_get_linear_srgb();
 
 			const bool previous = gs_framebuffer_srgb_enabled();
-			gs_enable_framebuffer_srgb(linear_srgb); // if it works, maybe this is all that was needed?
+			gs_enable_framebuffer_srgb(linear_srgb);
 
 			gs_eparam_t *image =
 				gs_effect_get_param_by_name(effect, "image");
@@ -147,12 +143,10 @@ void win_spout_offscreen_render(void* data, uint32_t cx, uint32_t cy)
 				gs_effect_set_texture(image, tex);
 
 			while (gs_effect_loop(effect, "Draw"))
-				gs_draw_sprite(tex, 0, width, height); // Why are there multiple passes on the default effect anyway?
+				gs_draw_sprite(tex, 0, width, height);
 
 			gs_enable_framebuffer_srgb(previous);
 		}
-
-		// gs_set_linear_srgb(previous);
 
 		gs_blend_state_pop();
 		gs_texrender_end(context->texrender_curr);
@@ -202,8 +196,6 @@ void* win_spout_filter_create(obs_data_t* settings, obs_source_t* source)
 
 	obs_get_video_info(&context->video_info);
 	win_spout_filter_update(context, settings);
-
-	
 
 	if (openDX11(context))
 	{
