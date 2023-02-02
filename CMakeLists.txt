@@ -50,13 +50,14 @@ include_directories(
 	${Qt5Widgets_INCLUDES}
 	)
 
-set(SPOUTDX_LIB "${CMAKE_SOURCE_DIR}/plugins/win-spout/deps/Spout2/BUILD/Binaries/x64/SpoutDX.lib")
+set(SPOUTDX_LIB "${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/x64/SpoutDX.lib")
 
 target_link_libraries(win-spout
 	${OBS_FRONTEND_LIB}
 	${PTHREAD_LIB}
 	${LIBOBS_LIB}
 	${SPOUTDX_LIB}
+	OBS::w32-pthreads
 	Qt::Core
 	Qt::Widgets
 	)
@@ -77,31 +78,46 @@ function(copy_spout_file)
 		COMMAND ${CMAKE_COMMAND} -E copy
 			"${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/${_src_suffix}/SpoutDX.dll"
 			"${OBS_OUTPUT_DIR}/$<CONFIGURATION>/${OBS_PLUGIN_DESTINATION}/SpoutDX.dll"
-		  COMMAND if $<CONFIG:Debug>==1 (
-			"${CMAKE_COMMAND}" -E copy
-			"${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/${_src_suffix}/Spout.pdb"
-			"${OBS_OUTPUT_DIR}/$<CONFIGURATION>/${OBS_PLUGIN_DESTINATION}/Spout.pdb")
-		COMMAND if $<CONFIG:Debug>==1 (
-			"${CMAKE_COMMAND}" -E copy
-			"${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/${_src_suffix}/SpoutLibrary.pdb"
-			"${OBS_OUTPUT_DIR}/$<CONFIGURATION>/${OBS_PLUGIN_DESTINATION}/SpoutLibrary.pdb")
-		COMMAND if $<CONFIG:Debug>==1 (
-			"${CMAKE_COMMAND}" -E copy
-			"${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/${_src_suffix}/SpoutDX.pdb"
-			"${OBS_OUTPUT_DIR}/$<CONFIGURATION>/${OBS_PLUGIN_DESTINATION}/SpoutDX.pdb")
-		COMMAND if $<CONFIG:RelWithDebInfo>==1 (
-			"${CMAKE_COMMAND}" -E copy
-			"${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/${_src_suffix}/Spout.pdb"
-			"${OBS_OUTPUT_DIR}/$<CONFIGURATION>/${OBS_PLUGIN_DESTINATION}/Spout.pdb")
-		COMMAND if $<CONFIG:RelWithDebInfo>==1 (
-			"${CMAKE_COMMAND}" -E copy
-			"${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/${_src_suffix}/SpoutLibrary.pdb"
-			"${OBS_OUTPUT_DIR}/$<CONFIGURATION>/${OBS_PLUGIN_DESTINATION}/SpoutLibrary.pdb")
-		COMMAND if $<CONFIG:RelWithDebInfo>==1 (
-			"${CMAKE_COMMAND}" -E copy
-			"${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/${_src_suffix}/SpoutDX.pdb"
-			"${OBS_OUTPUT_DIR}/$<CONFIGURATION>/${OBS_PLUGIN_DESTINATION}/SpoutDX.pdb")
 	)
+
+	if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/${_src_suffix}/Spout.pdb")
+		add_custom_command(TARGET win-spout POST_BUILD
+			COMMAND if $<CONFIG:Debug>==1(
+				"${CMAKE_COMMAND}" -E copy
+				"${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/${_src_suffix}/Spout.pdb"
+				"${OBS_OUTPUT_DIR}/$<CONFIGURATION>/${OBS_PLUGIN_DESTINATION}/Spout.pdb")
+			COMMAND if $<CONFIG:RelWithDebInfo>==1(
+				"${CMAKE_COMMAND}" -E copy
+				"${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/${_src_suffix}/Spout.pdb"
+				"${OBS_OUTPUT_DIR}/$<CONFIGURATION>/${OBS_PLUGIN_DESTINATION}/Spout.pdb")
+		)
+	endif()
+
+	if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/${_src_suffix}/SpoutLibrary.pdb")
+		add_custom_command(TARGET win-spout POST_BUILD
+			COMMAND if $<CONFIG:Debug>==1(
+				"${CMAKE_COMMAND}" -E copy
+				"${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/${_src_suffix}/SpoutLibrary.pdb"
+				"${OBS_OUTPUT_DIR}/$<CONFIGURATION>/${OBS_PLUGIN_DESTINATION}/SpoutLibrary.pdb")
+			COMMAND if $<CONFIG:RelWithDebInfo>==1(
+				"${CMAKE_COMMAND}" -E copy
+				"${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/${_src_suffix}/SpoutLibrary.pdb"
+				"${OBS_OUTPUT_DIR}/$<CONFIGURATION>/${OBS_PLUGIN_DESTINATION}/SpoutLibrary.pdb")
+		)
+	endif()
+
+	if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/${_src_suffix}/SpoutDX.pdb")
+		add_custom_command(TARGET win-spout POST_BUILD
+			COMMAND if $<CONFIG:Debug>==1(
+				"${CMAKE_COMMAND}" -E copy
+				"${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/${_src_suffix}/SpoutDX.pdb"
+				"${OBS_OUTPUT_DIR}/$<CONFIGURATION>/${OBS_PLUGIN_DESTINATION}/SpoutDX.pdb")
+			COMMAND if $<CONFIG:RelWithDebInfo>==1(
+				"${CMAKE_COMMAND}" -E copy
+				"${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/${_src_suffix}/SpoutDX.pdb"
+				"${OBS_OUTPUT_DIR}/$<CONFIGURATION>/${OBS_PLUGIN_DESTINATION}/SpoutDX.pdb")
+		)
+	endif()
 endfunction()
 
 setup_plugin_target(win-spout)
