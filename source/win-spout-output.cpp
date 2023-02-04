@@ -25,7 +25,8 @@ struct spout_output
 bool init_spout(void* data)
 {
 	spout_output* context = (spout_output*)data;
-
+	spoututils::SetSpoutLogLevel(spoututils::SPOUT_LOG_VERBOSE);
+	spoututils::EnableSpoutLog();
 	context->sender->SetMaxSenders(255);
 
 	if (!context->sender->OpenDirectX11()) {
@@ -100,6 +101,8 @@ bool win_spout_output_start(void* data)
 		return false;
 	}
 
+	pthread_mutex_lock(&context->mutex);
+
 	context->sender->SetSenderName(context->senderName);
 
 	int32_t width = (int32_t)obs_output_get_width(context->output);
@@ -109,12 +112,14 @@ bool win_spout_output_start(void* data)
 	if (!video)
 	{
 		blog(LOG_ERROR, "Trying to start with no video!");
+		pthread_mutex_unlock(&context->mutex);
 		return false;
 	}
 
 	if (!obs_output_can_begin_data_capture(context->output, 0))
 	{
 		blog(LOG_ERROR, "Unable to begin data capture!");
+		pthread_mutex_unlock(&context->mutex);
 		return false;
 	}
 
@@ -135,8 +140,9 @@ bool win_spout_output_start(void* data)
 	else
 		blog(LOG_INFO, "Creating capture with name: %s, width: %i, height: %i", context->senderName, width, height);
 
-
-	return context->output_started;
+	bool started = context->output_started;
+	pthread_mutex_unlock(&context->mutex);
+	return started;
 }
 
 void win_spout_output_stop(void* data, uint64_t ts)
@@ -145,6 +151,8 @@ void win_spout_output_stop(void* data, uint64_t ts)
 
 	spout_output* context = (spout_output*)data;
 
+	pthread_mutex_lock(&context->mutex);
+
 	if (context->output_started)
 	{
 		context->output_started = false;
@@ -152,21 +160,25 @@ void win_spout_output_stop(void* data, uint64_t ts)
 		obs_output_end_data_capture(context->output);
 		context->sender->ReleaseSender();
 	}
+
+	pthread_mutex_unlock(&context->mutex);
 }
 
 void win_spout_output_rawvideo(void* data, struct video_data* frame)
 {
 	spout_output* context = (spout_output*)data;
 
+	pthread_mutex_lock(&context->mutex);
+
 	if (!context->output_started)
 	{
+		pthread_mutex_unlock(&context->mutex);
 		return;
 	}
 
 	int32_t width = (int32_t)obs_output_get_width(context->output);
 	int32_t height = (int32_t)obs_output_get_height(context->output);
 
-	pthread_mutex_lock(&context->mutex);
 	context->sender->SendImage(frame->data[0], width, height);
 	pthread_mutex_unlock(&context->mutex);
 }
