@@ -26,6 +26,9 @@ struct spout_output
 	pthread_mutex_t mutex;
 };
 
+// Forward decls
+void win_spout_output_destroy(void *data);
+
 bool init_spout(void* data)
 {
 	spout_output* context = (spout_output*)data;
@@ -54,20 +57,6 @@ static void win_spout_output_update(void* data, obs_data_t* settings)
 	context->senderName = obs_data_get_string(settings, "senderName");
 }
 
-static void win_spout_output_destroy(void* data)
-{
-	spout_output* context = (spout_output*)data;
-
-	context->sender->CloseDirectX11();
-	delete context->sender;
-
-	if (context)
-	{
-		pthread_mutex_destroy(&context->mutex);
-		bfree(context);
-	}
-}
-
 static void* win_spout_output_create(obs_data_t* settings, obs_output_t* output)
 {
 	spout_output* context = (spout_output*)bzalloc(sizeof(spout_output));
@@ -76,23 +65,42 @@ static void* win_spout_output_create(obs_data_t* settings, obs_output_t* output)
 	context->output_started = false;
 	context->sender = new spoutDX;
 
-	win_spout_output_update(context, settings);
-
-	if (init_spout(context))
-	{
-		pthread_mutex_init_value(&context->mutex);
-		if (pthread_mutex_init(&context->mutex, NULL) == 0) {
-			UNUSED_PARAMETER(settings);
-			return context;
-		}
+	pthread_mutex_init_value(&context->mutex);
+	if (pthread_mutex_init(&context->mutex, NULL) != 0) {
+		blog(LOG_ERROR, "Failed to create mutex for spout output!");
+		win_spout_output_destroy(context);
+		return nullptr;
 	}
 
-	blog(LOG_ERROR, "Failed to create spout output!");
-	context->sender->CloseDirectX11();
-	delete context->sender;
-	win_spout_output_destroy(context);
+	if (!init_spout(context))
+	{
+		blog(LOG_ERROR, "Failed to create spout output!");
+		win_spout_output_destroy(context);
+		return nullptr;	
+	}
 
-	return NULL;
+	win_spout_output_update(context, settings);
+
+	// from this point, need to lock mutex to access context safely
+	return context;
+}
+
+static void win_spout_output_destroy(void *data)
+{
+	spout_output *context = (spout_output *)data;
+
+	if (!context) {
+		return;
+	}
+
+	if (context->sender) {
+		context->sender->CloseDirectX11();
+		delete context->sender;
+		context->sender = nullptr;
+	}
+
+	pthread_mutex_destroy(&context->mutex);
+	bfree(context);
 }
 
 bool win_spout_output_start(void* data)
