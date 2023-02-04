@@ -31,6 +31,9 @@ struct win_spout_filter
 	gs_stagesurf_t* stagesurface;           // "
 	uint32_t video_linesize;
 
+	// detect that source is still active by setting in _videorender() and clearing in _offscreen_render()
+	bool is_active;
+
 	// mutex guards accesses to rest of context variables,
 	// and any methods on spoutDX* filter_sender.
 	// not sure about accesse to gs_ types.
@@ -93,6 +96,8 @@ void win_spout_offscreen_render(void* data, uint32_t cx, uint32_t cy)
 	UNUSED_PARAMETER(cy);
 	struct win_spout_filter* context = (win_spout_filter*)data;
 
+	if (!context->is_active) { return; }
+	context->is_active = false;
 
 	pthread_mutex_lock(&context->mutex);
 	obs_source_t* source_context = context->source_context;
@@ -217,6 +222,8 @@ void* win_spout_filter_create(obs_data_t* settings, obs_source_t* source)
 	context->texrender_intermediate = nullptr;
 	context->stagesurface = nullptr;
 
+	context->is_active = false;
+
 	pthread_mutex_init_value(&context->mutex);
 	if (pthread_mutex_init(&context->mutex, NULL) != 0) {
 		blog(LOG_ERROR, "Failed to create mutex for spout filter!");
@@ -299,6 +306,13 @@ void win_spout_filter_videorender(void* data, gs_effect_t* effect)
 {
 	UNUSED_PARAMETER(effect);
 	struct win_spout_filter* context = (win_spout_filter*)data;
+
+	pthread_mutex_lock(&context->mutex);
+
+	context->is_active = true;
+
+	pthread_mutex_unlock(&context->mutex);
+
 	obs_source_skip_video_filter(context->source_context);
 }
 
