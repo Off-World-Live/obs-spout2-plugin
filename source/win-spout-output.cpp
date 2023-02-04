@@ -19,6 +19,10 @@ struct spout_output
 	obs_output_t* output;
 	const char* senderName;
 	bool output_started;
+	// mutex guards accesses to rest of context variables,
+	// and any methods on spoutDX* sender.
+	// Calling obs methods on obs_output_t* output seems thread-safe.
+	// trying to avoid calling obs methods while holding our own mutex.
 	pthread_mutex_t mutex;
 };
 
@@ -103,23 +107,26 @@ bool win_spout_output_start(void* data)
 
 	pthread_mutex_lock(&context->mutex);
 
+	const char *senderName = context->senderName;
 	context->sender->SetSenderName(context->senderName);
 
-	int32_t width = (int32_t)obs_output_get_width(context->output);
-	int32_t height = (int32_t)obs_output_get_height(context->output);
+	obs_output_t *output = context->output;
 
-	video_t* video = obs_output_video(context->output);
+	pthread_mutex_unlock(&context->mutex);
+
+	int32_t width = (int32_t)obs_output_get_width(output);
+	int32_t height = (int32_t)obs_output_get_height(output);
+
+	video_t* video = obs_output_video(output);
 	if (!video)
 	{
 		blog(LOG_ERROR, "Trying to start with no video!");
-		pthread_mutex_unlock(&context->mutex);
 		return false;
 	}
 
-	if (!obs_output_can_begin_data_capture(context->output, 0))
+	if (!obs_output_can_begin_data_capture(output, 0))
 	{
 		blog(LOG_ERROR, "Unable to begin data capture!");
-		pthread_mutex_unlock(&context->mutex);
 		return false;
 	}
 
@@ -129,19 +136,24 @@ bool win_spout_output_start(void* data)
 	info.width = width;
 	info.height = height;
 
-	obs_output_set_video_conversion(context->output, &info);
+	obs_output_set_video_conversion(output, &info);
 
-	context->output_started = obs_output_begin_data_capture(context->output, 0);
+	bool started = obs_output_begin_data_capture(output, 0);
 
-	if (!context->output_started)
-	{
-		blog(LOG_ERROR, "Unable to start capture!");
-	}
-	else
-		blog(LOG_INFO, "Creating capture with name: %s, width: %i, height: %i", context->senderName, width, height);
+	pthread_mutex_lock(&context->mutex);
 
-	bool started = context->output_started;
+	context->output_started = started;
+
 	pthread_mutex_unlock(&context->mutex);
+
+	if (!started) {
+		blog(LOG_ERROR, "Unable to start capture!");
+	} else {
+		blog(LOG_INFO,
+		     "Creating capture with name: %s, width: %i, height: %i",
+		     context->senderName, width, height);
+	}
+
 	return started;
 }
 
@@ -152,16 +164,20 @@ void win_spout_output_stop(void* data, uint64_t ts)
 	spout_output* context = (spout_output*)data;
 
 	pthread_mutex_lock(&context->mutex);
+	bool started = context->output_started;
+	pthread_mutex_unlock(&context->mutex);
 
-	if (context->output_started)
+	if (started)
 	{
+		obs_output_end_data_capture(context->output);
+
+		pthread_mutex_lock(&context->mutex);
+
+		context->sender->ReleaseSender();
 		context->output_started = false;
 
-		obs_output_end_data_capture(context->output);
-		context->sender->ReleaseSender();
+		pthread_mutex_unlock(&context->mutex);
 	}
-
-	pthread_mutex_unlock(&context->mutex);
 }
 
 void win_spout_output_rawvideo(void* data, struct video_data* frame)
@@ -170,16 +186,23 @@ void win_spout_output_rawvideo(void* data, struct video_data* frame)
 
 	pthread_mutex_lock(&context->mutex);
 
-	if (!context->output_started)
+	bool started = context->output_started;
+	obs_output_t *output = context->output;
+
+	pthread_mutex_unlock(&context->mutex);
+
+	if (!started)
 	{
-		pthread_mutex_unlock(&context->mutex);
 		return;
 	}
 
-	int32_t width = (int32_t)obs_output_get_width(context->output);
-	int32_t height = (int32_t)obs_output_get_height(context->output);
+	int32_t width = (int32_t)obs_output_get_width(output);
+	int32_t height = (int32_t)obs_output_get_height(output);
+
+	pthread_mutex_lock(&context->mutex);
 
 	context->sender->SendImage(frame->data[0], width, height);
+
 	pthread_mutex_unlock(&context->mutex);
 }
 
