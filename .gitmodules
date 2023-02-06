@@ -1,0 +1,3 @@
+[submodule "deps/Spout2"]
+	path = deps/Spout2
+	url = git@github.com:leadedge/Spout2
