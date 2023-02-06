@@ -32,8 +32,9 @@ void win_spout_output_destroy(void *data);
 bool init_spout(void* data)
 {
 	spout_output* context = (spout_output*)data;
-	spoututils::SetSpoutLogLevel(spoututils::SPOUT_LOG_VERBOSE);
-	spoututils::EnableSpoutLog();
+	// Enable for debugging spout:
+	// spoututils::SetSpoutLogLevel(spoututils::SPOUT_LOG_VERBOSE);
+	// spoututils::EnableSpoutLog();
 	context->sender->SetMaxSenders(255);
 
 	if (!context->sender->OpenDirectX11()) {
