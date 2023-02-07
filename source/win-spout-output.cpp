@@ -174,11 +174,12 @@ void win_spout_output_stop(void* data, uint64_t ts)
 
 	pthread_mutex_lock(&context->mutex);
 	bool started = context->output_started;
+	obs_output_t *output = context->output;
 	pthread_mutex_unlock(&context->mutex);
 
 	if (started)
 	{
-		obs_output_end_data_capture(context->output);
+		obs_output_end_data_capture(output);
 
 		pthread_mutex_lock(&context->mutex);
 

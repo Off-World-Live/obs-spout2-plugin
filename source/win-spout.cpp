@@ -33,6 +33,19 @@ struct obs_source_info spout_filter_info;
 win_spout_output_settings* spout_output_settings;
 obs_output_t* win_spout_out;
 
+static void spout_obs_event(enum obs_frontend_event event, void *)
+{
+	if (event == OBS_FRONTEND_EVENT_EXIT) {
+		if (!win_spout_out) {
+			return;
+		}
+
+		obs_output_stop(win_spout_out);
+		obs_output_release(win_spout_out);
+		win_spout_out = nullptr;
+	}
+}
+
 bool obs_module_load(void)
 {
 	// load spout - source
@@ -68,6 +81,8 @@ bool obs_module_load(void)
 	auto menu_cb = [] { spout_output_settings->toggle_show_hide(); };
 	menu_action->connect(menu_action, &QAction::triggered, menu_cb);
 
+	obs_frontend_add_event_callback(spout_obs_event, nullptr);
+
 	// load spout filter
 	spout_filter_info = create_spout_filter_info();
 	obs_register_source(&spout_filter_info);
@@ -79,8 +94,6 @@ bool obs_module_load(void)
 
 void obs_module_unload()
 {
-	obs_output_release(win_spout_out);
-	win_spout_out = nullptr;
 	blog(LOG_INFO, "win-spout unloaded!");
 }
 
