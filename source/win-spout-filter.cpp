@@ -20,42 +20,68 @@
 
 struct win_spout_filter
 {
+	// mutex guards accesses to fields in SHARED section
+	// and any methods on spoutDX* filter_sender.
+	// Calling obs methods on obs types seems thread-safe.
+	// trying to avoid calling obs methods while holding our own mutex.
+	pthread_mutex_t mutex;
+
+	// [SHARED]
 	spoutDX* filter_sender; // owned by the filter
 	obs_source_t* source_context;
 	const char* sender_name; // owned by obs
-	uint32_t width;
-	uint32_t height;
+
+	// [RENDER] After creation, only accessed on render thread
 	gs_texrender_t* texrender_curr;         // owned by filter
 	gs_texrender_t* texrender_prev;         // "
 	gs_texrender_t* texrender_intermediate; // "
 	gs_stagesurf_t* stagesurface;           // "
-	uint32_t video_linesize;
 
+	// set after we successfully init on render thread
+	bool is_initialised;
 	// detect that source is still active by setting in _videorender() and clearing in _offscreen_render()
 	bool is_active;
-
-	// mutex guards accesses to rest of context variables,
-	// and any methods on spoutDX* filter_sender.
-	// not sure about accesse to gs_ types.
-	// Calling obs methods on obs types seems thread-safe.
-	// trying to avoid calling obs methods while holding our own mutex.
-	pthread_mutex_t mutex;
 };
 
 // forward decls
 void win_spout_filter_update(void *data, obs_data_t *settings);
 void win_spout_filter_destroy(void *data);
 
-bool openDX11(void* data)
+bool init_on_render_thread(struct win_spout_filter *context)
 {
-	struct win_spout_filter* context = (win_spout_filter*)data;
+	if (context->is_initialised) { return true; }
+
+	// Create textures
+	// Use a Spout-compatible texture format
+	context->texrender_curr =
+		gs_texrender_create(GS_BGRA_UNORM, GS_ZS_NONE);
+	context->texrender_prev =
+		gs_texrender_create(GS_BGRA_UNORM, GS_ZS_NONE);
+	context->texrender_intermediate =
+		gs_texrender_create(GS_BGRA, GS_ZS_NONE);
+
+	// Init Spout
 	context->filter_sender->SetMaxSenders(255);
-	if (!context->filter_sender->OpenDirectX11())
+
+	// Get the OBS D3D11 device, rather than creating a new one for each filter.
+	// If this ends up causing deadlocks or perf issues, can revisit.
+	ID3D11Device *const d3d_device = (ID3D11Device *)gs_get_device_obj();
+
+	if (!d3d_device) {
+		blog(LOG_ERROR, "Failed to retrieve OBS d3d11 device");
+		return false;
+	}
+
+	if (!context->filter_sender->OpenDirectX11(d3d_device))
 	{
 		blog(LOG_ERROR, "Failed to Open DX11");
 		return false;
 	}
+
 	blog(LOG_INFO, "Opened DX11");
+
+	context->is_initialised = true;
+
 	return true;
 }
 
@@ -96,8 +122,16 @@ void win_spout_offscreen_render(void* data, uint32_t cx, uint32_t cy)
 	UNUSED_PARAMETER(cy);
 	struct win_spout_filter* context = (win_spout_filter*)data;
 
+	// We check if video_render has been called since the last offscreen_render
 	if (!context->is_active) { return; }
 	context->is_active = false;
+
+	if (!init_on_render_thread(context)) {
+		blog(LOG_ERROR,
+		     "Failed to create DX11 context for spout filter!");
+		win_spout_filter_destroy(context);
+		return;
+	}
 
 	pthread_mutex_lock(&context->mutex);
 	obs_source_t* source_context = context->source_context;
@@ -169,14 +203,18 @@ void win_spout_offscreen_render(void* data, uint32_t cx, uint32_t cy)
 		gs_blend_state_pop();
 		gs_texrender_end(texrender_curr);
 
+		bool ok = false;
+
 		gs_texture_t *prev_tex =
 			gs_texrender_get_texture(texrender_prev);
-
+		ID3D11Texture2D *prev_tex_d3d11 = nullptr;
+		if (prev_tex) {
+			prev_tex_d3d11 = (ID3D11Texture2D *)gs_texture_get_obj(prev_tex);
+		}
 		pthread_mutex_lock(&context->mutex);
 
 		if (prev_tex) {
-			context->filter_sender->SendTexture((
-				ID3D11Texture2D *)gs_texture_get_obj(prev_tex));
+			ok = context->filter_sender->SendTexture(prev_tex_d3d11);
 		}
 
 		// Swap the buffers
@@ -187,6 +225,10 @@ void win_spout_offscreen_render(void* data, uint32_t cx, uint32_t cy)
 		context->texrender_prev = texrender_curr;
 
 		pthread_mutex_unlock(&context->mutex);
+
+		if (!ok) {
+			blog(LOG_ERROR, "Error calling SendTexture()!");
+		}
 	}
 }
 
@@ -221,7 +263,7 @@ void* win_spout_filter_create(obs_data_t* settings, obs_source_t* source)
 	context->texrender_prev = nullptr;
 	context->texrender_intermediate = nullptr;
 	context->stagesurface = nullptr;
-
+	context->is_initialised = false;
 	context->is_active = false;
 
 	pthread_mutex_init_value(&context->mutex);
@@ -232,21 +274,10 @@ void* win_spout_filter_create(obs_data_t* settings, obs_source_t* source)
 	}
 
 	context->source_context = source;
-	// Use a Spout-compatible texture format
-	context->texrender_curr = gs_texrender_create(GS_BGRA_UNORM, GS_ZS_NONE);
-	context->texrender_prev = gs_texrender_create(GS_BGRA_UNORM, GS_ZS_NONE);
-	context->texrender_intermediate =
-		gs_texrender_create(GS_BGRA, GS_ZS_NONE);
+
 	context->sender_name = obs_data_get_string(settings, FILTER_PROP_NAME);
 
 	context->filter_sender = new spoutDX;
-
-	if (!openDX11(context))
-	{
-		blog(LOG_ERROR, "Failed to create DX11 context for spout filter!");
-		win_spout_filter_destroy(context);
-		return nullptr;
-	}
 
 	win_spout_filter_update(context, settings);
 
