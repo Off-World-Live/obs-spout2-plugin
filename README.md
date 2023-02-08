@@ -29,7 +29,7 @@ Thanks to the authors of [SPOUT](https://github.com/leadedge/Spout2) for the lib
 
 ## Installation
 
-- Go to the [Releases Page](https://github.com/Off-World-Live/obs-spout2-source-plugin/releases)
+- Go to the [Releases Page](https://github.com/Off-World-Live/obs-spout2-plugin/releases)
 - Download the windows installer: `OBS_Spout2_Plugin_Installer.exe`
 - Run the installer (accepting installation from untrusted source)
 - Select the `OBS` directory if not the default install location
@@ -38,14 +38,21 @@ Thanks to the authors of [SPOUT](https://github.com/leadedge/Spout2) for the lib
 
 ## Contributing / Building
 
-- Clone the [main OBS repository](https://github.com/obsproject/obs-studio)
+- Clone this repo recursively
+```
+git clone --recursive git@github.com:off-world-live/obs-spout2-plugin
+```
+- Clone the [main OBS repository](https://github.com/obsproject/obs-studio) recursively.
 - Carefully follow their [build instructions](https://obsproject.com/wiki/install-instructions#windows-build-directions) ensuring that your `build` folder is `build64`
 - Add this repo as a submodule inside the plugins folder: `git submodule add git@github.com:Off-World-Live/obs-spout2-source-plugin.git plugins/win-spout`
-- Clone Spout [github.com/leadedge/Spout2](https://github.com/leadedge/Spout2) to the folder `deps/Spout2` inside
-  this directory
 - Edit the `CMakeLists.txt` file in `/plugins` directory and add `add_subdirectory(win-spout)` inside the `if(WIN32)` block.
 - Run `Configure`, `Generate` and then `Open Project` in the `CMake Gui`
 
+### Building a release locally
+
+- Open `git bash` or similar bash terminal interpreter
+- Run `./scripts/Release.sh <version number>`
+- You should find the executable (installer) and zip file in the main `win-spout` directory
 ### Building the windows installer
 
 - Download the latest version of [NSIS here](https://nsis.sourceforge.io/Download);
