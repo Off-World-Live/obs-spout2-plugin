@@ -4,20 +4,11 @@ endif()
 cmake_minimum_required(VERSION 3.5)
 project(win-spout)
 
-set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_PREFIX_PATH "${QTDIR}")
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/plugins/win-spout/external")
-
-set(LIBOBS_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/libobs")
-set(LIBOBS_LIB "${CMAKE_BINARY_DIR}/libobs/$<CONFIGURATION>/obs.lib")
-set(OBS_FRONTEND_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/UI/obs-frontend-api")
-set(OBS_FRONTEND_LIB "${CMAKE_BINARY_DIR}/UI/obs-frontend-api/$<CONFIGURATION>/obs-frontend-api.lib")
-set(PTHREAD_LIB "${CMAKE_BINARY_DIR}/deps/w32-pthreads/$<CONFIGURATION>/w32-pthreads.lib")
-
-find_qt(COMPONENTS Core Widgets)
 
 if(MSVC)
 	include_directories(deps/Spout2/SPOUTSDK/SpoutLibrary)
@@ -25,41 +16,38 @@ if(MSVC)
 	link_directories(deps/Spout2/BUILD/Binaries/x64)
 endif()
 
-set(win-spout_HEADERS
-	source/win-spout.h
-	source/win-spout-config.h
-	source/ui/win-spout-output-settings.h)
+add_library(win-spout MODULE)
+add_library(OBS::win-spout ALIAS win-spout)
 
-set(win-spout_SOURCES
-	source/win-spout.cpp
-	source/win-spout-source.cpp
-	source/win-spout-output.cpp
-	source/win-spout-filter.cpp
-	source/win-spout-config.cpp
-	source/ui/win-spout-output-settings.cpp)
+target_sources(
+	win-spout
+	PRIVATE 
+		source/win-spout.h
+		source/win-spout-config.h
+		source/ui/win-spout-output-settings.h
+		source/win-spout.cpp
+		source/win-spout-source.cpp
+		source/win-spout-output.cpp
+		source/win-spout-filter.cpp
+		source/win-spout-config.cpp
+		source/ui/win-spout-output-settings.cpp)
 
-add_library(win-spout MODULE
-	${win-spout_SOURCES}
-	${win-spout_HEADERS})
-
-
-include_directories(
-	${OBS_FRONTEND_INCLUDE_DIR}
-	${LIBOBS_INCLUDE_DIR}
-	${Qt5Core_INCLUDES}
-	${Qt5Widgets_INCLUDES}
-	)
+target_include_directories(win-spout
+	PUBLIC 
+		obs::frontend-api
+		obs::libobs
+)
 
 set(SPOUTDX_LIB "${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/x64/SpoutDX.lib")
 
 target_link_libraries(win-spout
-	${OBS_FRONTEND_LIB}
-	${PTHREAD_LIB}
-	${LIBOBS_LIB}
-	${SPOUTDX_LIB}
-	OBS::w32-pthreads
-	Qt::Core
-	Qt::Widgets
+	PRIVATE 
+		OBS::frontend-api
+		OBS::libobs
+		${SPOUTDX_LIB}
+		OBS::w32-pthreads
+		Qt::Core
+		Qt::Widgets
 	)
 
 function(copy_spout_file)
@@ -120,6 +108,7 @@ function(copy_spout_file)
 	endif()
 endfunction()
 
-setup_plugin_target(win-spout)
+set_target_properties_obs(win-spout PROPERTIES FOLDER plugins/win-spout PREFIX "")
+
 copy_spout_file()
 

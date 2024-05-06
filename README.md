@@ -43,7 +43,7 @@ Thanks to the authors of [SPOUT](https://github.com/leadedge/Spout2) for the lib
 git clone --recursive git@github.com:off-world-live/obs-spout2-plugin
 ```
 - Clone the [main OBS repository](https://github.com/obsproject/obs-studio) recursively.
-- Carefully follow their [build instructions](https://obsproject.com/wiki/install-instructions#windows-build-directions) ensuring that your `build` folder is `build64`
+- Carefully follow their [build instructions](https://obsproject.com/wiki/install-instructions#windows-build-directions)
 - Add this repo as a submodule inside the plugins folder: `git submodule add git@github.com:Off-World-Live/obs-spout2-source-plugin.git plugins/win-spout`
 - Edit the `CMakeLists.txt` file in `/plugins` directory and add `add_subdirectory(win-spout)` inside the `if(WIN32)` block.
 - Run `Configure`, `Generate` and then `Open Project` in the `CMake Gui`

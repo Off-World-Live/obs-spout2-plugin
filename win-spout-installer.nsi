@@ -61,7 +61,7 @@ Section "Spout 2 OBS Plugin" Section1
 
 	; Set Section Files and Shortcuts
 	SetOutPath "$INSTDIR\obs-plugins\64bit\"
-	File "..\..\build64\plugins\win-spout\Release\win-spout.dll"
+	File "..\..\build_x64\plugins\win-spout\Release\win-spout.dll"
 	File "..\..\plugins\win-spout\deps\Spout2\BUILD\Binaries\x64\Spout.dll"
 	File "..\..\plugins\win-spout\deps\Spout2\BUILD\Binaries\x64\SpoutDX.dll"
 	File "..\..\plugins\win-spout\deps\Spout2\BUILD\Binaries\x64\SpoutLibrary.dll"
