@@ -140,7 +140,10 @@ void win_spout_offscreen_render(void* data, uint32_t cx, uint32_t cy)
 	gs_texrender_t* texrender_prev = context->texrender_prev;
 	pthread_mutex_unlock(&context->mutex);
 
-	obs_source_t* target = obs_filter_get_parent(source_context);
+	obs_source_t* parent = obs_filter_get_parent(source_context);
+	if (!parent) return;
+
+	obs_source_t *target = obs_filter_get_target(source_context);
 	if (!target) return;
 
 	uint32_t width = obs_source_get_base_width(target);
@@ -159,7 +162,7 @@ void win_spout_offscreen_render(void* data, uint32_t cx, uint32_t cy)
 		gs_blend_state_push();
 		gs_blend_function(GS_BLEND_ONE, GS_BLEND_ZERO);
 
-		obs_source_video_render(target);
+		obs_source_video_render(parent);
 
 		gs_blend_state_pop();
 		gs_texrender_end(texrender_intermediate);
