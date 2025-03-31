@@ -10,10 +10,9 @@
 #ifndef WINSPOUT_H
 #define WINSPOUT_H
 
-#define blog(log_level, message, ...) \
-	blog(log_level, "[win_spout] " message, ##__VA_ARGS__)
+#define blog(log_level, message, ...) blog(log_level, "[win_spout] " message, ##__VA_ARGS__)
 
-void spout_output_start(const char* SpoutName);
+void spout_output_start(const char *SpoutName);
 void spout_output_stop();
 
 #endif // WINSPOUT_H
