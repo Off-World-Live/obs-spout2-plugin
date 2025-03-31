@@ -21,7 +21,7 @@ win_spout_config* win_spout_config::_instance = nullptr;
 win_spout_config::win_spout_config()
 	: auto_start(false), spout_output_name("OBS_Spout")
 {
-	config_t* obs_config = obs_frontend_get_global_config();
+	config_t* obs_config = obs_frontend_get_user_config();
 
 	if (obs_config) {
 		config_set_default_bool(obs_config, SECTION_NAME,
@@ -34,7 +34,7 @@ win_spout_config::win_spout_config()
 
 void win_spout_config::load()
 {
-	config_t* obs_config = obs_frontend_get_global_config();
+	config_t* obs_config = obs_frontend_get_user_config();
 	if (obs_config) {
 		auto_start = config_get_bool(obs_config, SECTION_NAME,
 						PARAM_AUTO_START);
@@ -45,7 +45,7 @@ void win_spout_config::load()
 
 void win_spout_config::save()
 {
-	config_t* obs_config = obs_frontend_get_global_config();
+	config_t* obs_config = obs_frontend_get_user_config();
 	if (obs_config) {
 		config_set_bool(obs_config, SECTION_NAME,
 				PARAM_AUTO_START, auto_start);
