@@ -1,0 +1,119 @@
+name: Build Project
+on:
+  workflow_call:
+    outputs:
+      pluginName:
+        description: Project name detected by parsing build spec file
+        value: ${{ jobs.check-event.outputs.pluginName }}
+jobs:
+  check-event:
+    name: Check GitHub Event Data 🔎
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+    outputs:
+      package: ${{ steps.setup.outputs.package }}
+      codesign: ${{ steps.setup.outputs.codesign }}
+      notarize: ${{ steps.setup.outputs.notarize }}
+      config: ${{ steps.setup.outputs.config }}
+      commitHash: ${{ steps.setup.outputs.commitHash }}
+      pluginName: ${{ steps.setup.outputs.pluginName }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check Event Data ☑️
+        id: setup
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          : Check Event Data ☑️
+          if [[ "${RUNNER_DEBUG}" ]]; then set -x; fi
+
+          case "${GITHUB_EVENT_NAME}" in
+            pull_request)
+              config_data=('codesign:false' 'notarize:false' 'package:false' 'config:RelWithDebInfo')
+              if gh pr view ${{ github.event.number }} --json labels \
+                | jq -e -r '.labels[] | select(.name == "Seeking Testers")' > /dev/null; then
+                config_data[0]='codesign:true'
+                config_data[2]='package:true'
+              fi
+              ;;
+            push)
+              config_data=('codesign:true' 'notarize:false' 'package:true' 'config:RelWithDebInfo')
+              if [[ ${GITHUB_REF_NAME} =~ [0-9]+.[0-9]+.[0-9]+(-(rc|beta).+)? ]]; then
+                config_data[1]='notarize:true'
+                config_data[3]='config:Release'
+              fi
+              ;;
+            workflow_dispatch)
+              config_data=('codesign:true' 'notarize:false' 'package:false' 'config:RelWithDebInfo')
+              ;;
+            schedule)
+              config_data=('codesign:true' 'notarize:false' 'package:true' 'config:RelWithDebInfo')
+              ;;
+            *) ;;
+          esac
+
+          for config in "${config_data[@]}"; do
+            IFS=':' read -r key value <<< "${config}"
+            echo "${key}=${value}" >> $GITHUB_OUTPUT
+          done
+          echo "commitHash=${GITHUB_SHA:0:9}" >> $GITHUB_OUTPUT
+
+          plugin_name="$(grep 'name' buildspec.json | sed -E -e 's/^.+"name":[^"]+"(.+)",?$/\1/g')"
+          plugin_display_name="$(grep 'displayName' buildspec.json | sed -E -e 's/^.+"displayName":[^"]+"(.+)",?$/\1/g' || echo "")"
+
+          if [[ "${plugin_display_name}" ]]; then
+            echo "pluginName=${plugin_display_name}" >> $GITHUB_OUTPUT
+          else
+            echo "pluginName=${plugin_name}" >> $GITHUB_OUTPUT
+          fi
+
+  windows-build:
+    name: Build for Windows 🪟
+    runs-on: windows-2022
+    needs: check-event
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set Up Environment 🔧
+        id: setup
+        run: |
+          # Set Up Environment 🔧
+          if ( $Env:RUNNER_DEBUG -ne $null ) {
+            Set-PSDebug -Trace 1
+          }
+
+          $BuildSpec = Get-Content -Path buildspec.json -Raw | ConvertFrom-Json
+          $ProductName = $BuildSpec.name
+          $ProductVersion = $BuildSpec.version
+
+          "pluginName=${ProductName}" >> $env:GITHUB_OUTPUT
+          "pluginVersion=${ProductVersion}" >> $env:GITHUB_OUTPUT
+
+      - name: Build Plugin 🧱
+        uses: ./.github/actions/build-plugin
+        with:
+          target: x64
+          config: ${{ needs.check-event.outputs.config }}
+
+      - name: Package Plugin 📀
+        uses: ./.github/actions/package-plugin
+        with:
+          target: x64
+          config: ${{ needs.check-event.outputs.config }}
+          package: ${{ fromJSON(needs.check-event.outputs.package) }}
+
+      - name: Upload Artifacts 📡
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-windows-x64-${{ needs.check-event.outputs.commitHash }}
+          path: ${{ github.workspace }}/release/${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-windows-x64*.*
