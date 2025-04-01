@@ -1,0 +1,35 @@
+name: Package plugin
+description: Packages the plugin for specified architecture and build config.
+inputs:
+  target:
+    description: Build target for dependencies
+    required: true
+  config:
+    description: Build configuration
+    required: false
+    default: RelWithDebInfo
+  package:
+    description: Create Windows installation package
+    required: true
+  workingDirectory:
+    description: Working directory for packaging
+    required: false
+    default: ${{ github.workspace }}
+runs:
+  using: composite
+  steps:
+    - name: Run Windows Packaging
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        # Run Windows Packaging
+        if ( $Env:RUNNER_DEBUG -ne $null ) {
+          Set-PSDebug -Trace 1
+        }
+
+        $PackageArgs = @{
+          Target = '${{ inputs.target }}'
+          Configuration = '${{ inputs.config }}'
+        }
+
+        .github/scripts/Package-Windows.ps1 @PackageArgs

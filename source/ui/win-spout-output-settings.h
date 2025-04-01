@@ -17,10 +17,10 @@ class win_spout_output_settings : public QDialog {
 	Q_OBJECT
 
 public:
-	explicit win_spout_output_settings(QWidget* parent = 0);
+	explicit win_spout_output_settings(QWidget *parent = 0);
 	~win_spout_output_settings();
 	void set_started_button_state(bool started);
-	void close_event(QCloseEvent* event);
+	void close_event(QCloseEvent *event);
 	void toggle_show_hide();
 
 private Q_SLOTS:
@@ -28,7 +28,7 @@ private Q_SLOTS:
 	void on_stop();
 
 private:
-	Ui::win_spout_output_settings* ui;
+	Ui::win_spout_output_settings *ui;
 	void save_settings();
 };
 

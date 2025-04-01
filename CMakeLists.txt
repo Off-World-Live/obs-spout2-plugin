@@ -1,14 +1,41 @@
+cmake_minimum_required(VERSION 3.28...3.30)
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/common/bootstrap.cmake" NO_POLICY_SCOPE)
+
+project(${_name} VERSION ${_version})
+
 if (NOT WIN32)
 	return()
 endif()
-cmake_minimum_required(VERSION 3.5)
-project(win-spout)
 
-set(CMAKE_PREFIX_PATH "${QTDIR}")
-set(CMAKE_INCLUDE_CURRENT_DIR ON)
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTOUIC ON)
-set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/plugins/win-spout/external")
+option(ENABLE_FRONTEND_API "Use obs-frontend-api for UI functionality" OFF)
+option(ENABLE_QT "Use Qt functionality" OFF)
+
+include(compilerconfig)
+include(defaults)
+include(helpers)
+
+add_library(${CMAKE_PROJECT_NAME} MODULE)
+
+find_package(libobs REQUIRED)
+target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE OBS::libobs)
+
+if(ENABLE_FRONTEND_API)
+  find_package(obs-frontend-api REQUIRED)
+  target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE OBS::obs-frontend-api)
+endif()
+
+if(ENABLE_QT)
+  find_package(Qt6 COMPONENTS Widgets Core)
+  target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Qt6::Core Qt6::Widgets)
+  target_compile_options(
+    ${CMAKE_PROJECT_NAME}
+    PRIVATE $<$<C_COMPILER_ID:Clang,AppleClang>:-Wno-quoted-include-in-framework-header -Wno-comma>
+  )
+  set_target_properties(
+    ${CMAKE_PROJECT_NAME}
+    PROPERTIES AUTOMOC ON AUTOUIC ON AUTORCC ON
+  )
+endif()
 
 if(MSVC)
 	include_directories(deps/Spout2/SPOUTSDK/SpoutLibrary)
@@ -16,11 +43,8 @@ if(MSVC)
 	link_directories(deps/Spout2/BUILD/Binaries/x64)
 endif()
 
-add_library(win-spout MODULE)
-add_library(OBS::win-spout ALIAS win-spout)
-
 target_sources(
-	win-spout
+	${CMAKE_PROJECT_NAME}
 	PRIVATE 
 		source/win-spout.h
 		source/win-spout-config.h
@@ -32,83 +56,73 @@ target_sources(
 		source/win-spout-config.cpp
 		source/ui/win-spout-output-settings.cpp)
 
-target_include_directories(win-spout
-	PUBLIC 
-		obs::frontend-api
-		obs::libobs
-)
+set(SPOUT_BINARIES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/x64")
+set(SPOUTDX_LIB "${SPOUT_BINARIES_DIR}/SpoutDX.lib")
+set(SPOUTLIBRARY_LIB "${SPOUT_BINARIES_DIR}/SpoutLibrary.lib")
 
-set(SPOUTDX_LIB "${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/x64/SpoutDX.lib")
-
-target_link_libraries(win-spout
+target_link_libraries(
+	${CMAKE_PROJECT_NAME}
 	PRIVATE 
-		OBS::frontend-api
-		OBS::libobs
+		${SPOUTLIBRARY_LIB}
 		${SPOUTDX_LIB}
 		OBS::w32-pthreads
-		Qt::Core
-		Qt::Widgets
 	)
+
+set(INSTALLED_PLUGIN_BIN_DIR "${CMAKE_INSTALL_PREFIX}/${CMAKE_PROJECT_NAME}/${CMAKE_INSTALL_BINDIR}/64bit")
 
 function(copy_spout_file)
-	if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-		set(_src_suffix "x64")
-	else()
-		set(_src_suffix "win32")
-	endif()
-	add_custom_command(TARGET win-spout POST_BUILD
+	add_custom_command(TARGET ${CMAKE_PROJECT_NAME} POST_BUILD
 		COMMAND ${CMAKE_COMMAND} -E copy
-			"${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/${_src_suffix}/Spout.dll"
-			"${OBS_OUTPUT_DIR}/$<CONFIGURATION>/${OBS_PLUGIN_DESTINATION}/Spout.dll"
+			"${SPOUT_BINARIES_DIR}/Spout.dll"
+			"${INSTALLED_PLUGIN_BIN_DIR}/Spout.dll"
 		COMMAND ${CMAKE_COMMAND} -E copy
-			"${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/${_src_suffix}/SpoutLibrary.dll"
-			"${OBS_OUTPUT_DIR}/$<CONFIGURATION>/${OBS_PLUGIN_DESTINATION}/SpoutLibrary.dll"
+			"${SPOUT_BINARIES_DIR}/SpoutLibrary.dll"
+			"${INSTALLED_PLUGIN_BIN_DIR}/SpoutLibrary.dll"
 		COMMAND ${CMAKE_COMMAND} -E copy
-			"${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/${_src_suffix}/SpoutDX.dll"
-			"${OBS_OUTPUT_DIR}/$<CONFIGURATION>/${OBS_PLUGIN_DESTINATION}/SpoutDX.dll"
+			"${SPOUT_BINARIES_DIR}/SpoutDX.dll"
+			"${INSTALLED_PLUGIN_BIN_DIR}/SpoutDX.dll"
 	)
 
-	if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/${_src_suffix}/Spout.pdb")
-		add_custom_command(TARGET win-spout POST_BUILD
+	if(EXISTS "${SPOUT_BINARIES_DIR}/Spout.pdb")
+		add_custom_command(TARGET ${CMAKE_PROJECT_NAME} POST_BUILD
 			COMMAND if $<CONFIG:Debug>==1(
 				"${CMAKE_COMMAND}" -E copy
-				"${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/${_src_suffix}/Spout.pdb"
-				"${OBS_OUTPUT_DIR}/$<CONFIGURATION>/${OBS_PLUGIN_DESTINATION}/Spout.pdb")
+				"${SPOUT_BINARIES_DIR}/Spout.pdb"
+				"${INSTALLED_PLUGIN_BIN_DIR}/Spout.pdb")
 			COMMAND if $<CONFIG:RelWithDebInfo>==1(
 				"${CMAKE_COMMAND}" -E copy
-				"${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/${_src_suffix}/Spout.pdb"
-				"${OBS_OUTPUT_DIR}/$<CONFIGURATION>/${OBS_PLUGIN_DESTINATION}/Spout.pdb")
+				"${SPOUT_BINARIES_DIR}/Spout.pdb"
+				"${INSTALLED_PLUGIN_BIN_DIR}/Spout.pdb")
 		)
 	endif()
 
-	if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/${_src_suffix}/SpoutLibrary.pdb")
-		add_custom_command(TARGET win-spout POST_BUILD
+	if(EXISTS "${SPOUT_BINARIES_DIR}/SpoutLibrary.pdb")
+		add_custom_command(TARGET ${CMAKE_PROJECT_NAME} POST_BUILD
 			COMMAND if $<CONFIG:Debug>==1(
 				"${CMAKE_COMMAND}" -E copy
-				"${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/${_src_suffix}/SpoutLibrary.pdb"
-				"${OBS_OUTPUT_DIR}/$<CONFIGURATION>/${OBS_PLUGIN_DESTINATION}/SpoutLibrary.pdb")
+				"${SPOUT_BINARIES_DIR}/SpoutLibrary.pdb"
+				"${INSTALLED_PLUGIN_BIN_DIR}/SpoutLibrary.pdb")
 			COMMAND if $<CONFIG:RelWithDebInfo>==1(
 				"${CMAKE_COMMAND}" -E copy
-				"${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/${_src_suffix}/SpoutLibrary.pdb"
-				"${OBS_OUTPUT_DIR}/$<CONFIGURATION>/${OBS_PLUGIN_DESTINATION}/SpoutLibrary.pdb")
+				"${SPOUT_BINARIES_DIR}/SpoutLibrary.pdb"
+				"${INSTALLED_PLUGIN_BIN_DIR}/SpoutLibrary.pdb")
 		)
 	endif()
 
-	if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/${_src_suffix}/SpoutDX.pdb")
-		add_custom_command(TARGET win-spout POST_BUILD
+	if(EXISTS "${SPOUT_BINARIES_DIR}/SpoutDX.pdb")
+		add_custom_command(TARGET ${CMAKE_PROJECT_NAME} POST_BUILD
 			COMMAND if $<CONFIG:Debug>==1(
 				"${CMAKE_COMMAND}" -E copy
-				"${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/${_src_suffix}/SpoutDX.pdb"
-				"${OBS_OUTPUT_DIR}/$<CONFIGURATION>/${OBS_PLUGIN_DESTINATION}/SpoutDX.pdb")
+				"${SPOUT_BINARIES_DIR}/SpoutDX.pdb"
+				"${INSTALLED_PLUGIN_BIN_DIR}/SpoutDX.pdb")
 			COMMAND if $<CONFIG:RelWithDebInfo>==1(
 				"${CMAKE_COMMAND}" -E copy
-				"${CMAKE_CURRENT_SOURCE_DIR}/deps/Spout2/BUILD/Binaries/${_src_suffix}/SpoutDX.pdb"
-				"${OBS_OUTPUT_DIR}/$<CONFIGURATION>/${OBS_PLUGIN_DESTINATION}/SpoutDX.pdb")
+				"${SPOUT_BINARIES_DIR}/SpoutDX.pdb"
+				"${INSTALLED_PLUGIN_BIN_DIR}/SpoutDX.pdb")
 		)
 	endif()
 endfunction()
 
-set_target_properties_obs(win-spout PROPERTIES FOLDER plugins/win-spout PREFIX "")
+set_target_properties_plugin(${CMAKE_PROJECT_NAME} PROPERTIES OUTPUT_NAME ${_name})
 
 copy_spout_file()
-

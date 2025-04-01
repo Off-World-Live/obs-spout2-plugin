@@ -16,7 +16,7 @@
 class win_spout_config {
 public:
 	win_spout_config();
-	static win_spout_config* get();
+	static win_spout_config *get();
 	void load();
 	void save();
 
@@ -24,7 +24,7 @@ public:
 	QString spout_output_name;
 
 private:
-	static win_spout_config* _instance;
+	static win_spout_config *_instance;
 };
 
 #endif // WINSPOUTCONFIG_H

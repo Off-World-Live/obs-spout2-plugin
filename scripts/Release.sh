@@ -11,7 +11,7 @@ fi
 VERSION="$1"
 
 SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-OBS_ROOT_DIR="$SCRIPTS_DIR/../../.."
+OBS_ROOT_DIR="$SCRIPTS_DIR/.."
 
 echo ""
 echo "*** Build Plugin for Release -- Root Dir $OBS_ROOT_DIR ***"
@@ -19,7 +19,7 @@ echo ""
 
 MSBUILD_PATH="C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe"
 SEVENZIP_PATH="C:/Program Files/7-Zip/7z.exe"
-SOLUTION="$OBS_ROOT_DIR/build_x64/plugins/win-spout/win-spout.sln"
+SOLUTION="$OBS_ROOT_DIR/build_x64/win-spout.sln"
 BUILD_ARGS="/target:Rebuild /property:Configuration=Release /maxcpucount:8 /verbosity:quiet /consoleloggerparameters:Summary;ErrorsOnly;WarningsOnly"
 
 "$MSBUILD_PATH" "$SOLUTION" $BUILD_ARGS
