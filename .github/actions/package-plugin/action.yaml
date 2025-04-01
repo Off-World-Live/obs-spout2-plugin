@@ -15,9 +15,17 @@ inputs:
     description: Working directory for packaging
     required: false
     default: ${{ github.workspace }}
+  version:
+    description: Version of the plugin 
+    required: true
 runs:
   using: composite
   steps:
+    - name: Install NSIS
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        choco install nsis -y
     - name: Run Windows Packaging
       if: runner.os == 'Windows'
       shell: pwsh
@@ -33,3 +41,10 @@ runs:
         }
 
         .github/scripts/Package-Windows.ps1 @PackageArgs
+
+        "::group::Create Installer"
+        .github/scripts/BuildInstaller.ps1 -Version ${{ inputs.version }} -Configuration ${{ inputs.config }}
+        "::endgroup"
+
+
+
