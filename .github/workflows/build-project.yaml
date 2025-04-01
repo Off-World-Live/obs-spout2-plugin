@@ -109,6 +109,7 @@ jobs:
         uses: ./.github/actions/package-plugin
         with:
           target: x64
+          version: ${{ steps.setup.outputs.pluginVersion }}
           config: ${{ needs.check-event.outputs.config }}
           package: ${{ fromJSON(needs.check-event.outputs.package) }}
 
@@ -116,4 +117,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-windows-x64-${{ needs.check-event.outputs.commitHash }}
-          path: ${{ github.workspace }}/release/${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-windows-x64*.*
+          path: |
+            ${{ github.workspace }}/release/${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-windows-x64*.*
+            ${{ github.workspace }}/release/OBS_Spout2_Plugin_Install_v${{ steps.setup.outputs.pluginVersion }}.exe
