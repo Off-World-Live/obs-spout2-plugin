@@ -38,6 +38,8 @@ struct win_spout_filter {
 	bool is_initialised;
 	// detect that source is still active by setting in _videorender() and clearing in _offscreen_render()
 	bool is_active;
+	// holding a "showing" ref on the parent to keep it rendering off-screen
+	bool showing_held;
 };
 
 // forward decls
@@ -117,11 +119,8 @@ void win_spout_offscreen_render(void *data, uint32_t cx, uint32_t cy)
 	UNUSED_PARAMETER(cy);
 	struct win_spout_filter *context = (win_spout_filter *)data;
 
-	// Continuous broadcast: ignore whether the source is in the active scene and keep
-	// rendering/broadcasting as long as the filter is enabled, so the sender registers
-	// right after a cold start (fixes receivers not seeing the signal). When off, keep
-	// the previous behaviour: send only when video_render has set is_active (source
-	// drawn). Default off.
+	// Continuous mode sends every frame; otherwise only when video_render marked
+	// the source drawn (is_active). Default off.
 	const bool continuous = win_spout_config::get()->continuous_broadcast;
 
 	// Never broadcast while the filter is disabled, in either mode.
@@ -136,9 +135,8 @@ void win_spout_offscreen_render(void *data, uint32_t cx, uint32_t cy)
 	context->is_active = false;
 
 	if (!init_on_render_thread(context)) {
-		// The graphics device may not be ready during early cold start; just log and
-		// retry next frame. Never destroy context on the render thread here: OBS still
-		// holds this pointer and freeing it would crash (see #97).
+		// Device may not be ready yet on cold start; retry next frame. Never destroy
+		// the context here (still held by OBS) or it crashes (#97).
 		blog(LOG_ERROR, "Failed to init DX11 for spout filter, will retry next frame");
 		return;
 	}
@@ -161,8 +159,7 @@ void win_spout_offscreen_render(void *data, uint32_t cx, uint32_t cy)
 	uint32_t width = obs_source_get_base_width(target);
 	uint32_t height = obs_source_get_base_height(target);
 
-	// Skip this frame when the size is invalid (the source may not be ready yet in
-	// continuous mode) to avoid operating on a zero-sized texture.
+	// Skip zero-sized frames (source may not be ready yet).
 	if (width == 0 || height == 0)
 		return;
 
@@ -279,6 +276,7 @@ void *win_spout_filter_create(obs_data_t *settings, obs_source_t *source)
 	context->stagesurface = nullptr;
 	context->is_initialised = false;
 	context->is_active = false;
+	context->showing_held = false;
 
 	pthread_mutex_init_value(&context->mutex);
 	if (pthread_mutex_init(&context->mutex, NULL) != 0) {
@@ -303,6 +301,12 @@ void win_spout_filter_destroy(void *data)
 
 	if (!context) {
 		return;
+	}
+
+	// Fallback if destroyed without filter_remove (no-op if the parent is gone).
+	if (context->showing_held) {
+		obs_source_dec_showing(obs_filter_get_parent(context->source_context));
+		context->showing_held = false;
 	}
 
 	obs_remove_main_render_callback(win_spout_offscreen_render, context);
@@ -339,10 +343,36 @@ void win_spout_filter_destroy(void *data)
 	bfree(context);
 }
 
+void win_spout_filter_remove(void *data, obs_source_t *parent)
+{
+	struct win_spout_filter *context = (win_spout_filter *)data;
+
+	// Drop the showing ref while the parent is still known.
+	if (context->showing_held) {
+		obs_source_dec_showing(parent);
+		context->showing_held = false;
+	}
+}
+
 void win_spout_filter_tick(void *data, float seconds)
 {
 	UNUSED_PARAMETER(seconds);
 	struct win_spout_filter *context = (win_spout_filter *)data;
+
+	// OBS stops rendering sources that aren't shown anywhere. In continuous mode,
+	// hold a "showing" ref on the parent so it keeps rendering off-screen. This
+	// tick runs every frame regardless of scene, so it also drops the ref when the
+	// option or filter is turned off.
+	const bool want_showing = win_spout_config::get()->continuous_broadcast &&
+				  obs_source_enabled(context->source_context);
+
+	if (want_showing && !context->showing_held) {
+		obs_source_inc_showing(obs_filter_get_parent(context->source_context));
+		context->showing_held = true;
+	} else if (!want_showing && context->showing_held) {
+		obs_source_dec_showing(obs_filter_get_parent(context->source_context));
+		context->showing_held = false;
+	}
 }
 
 void win_spout_filter_videorender(void *data, gs_effect_t *effect)
@@ -373,6 +403,7 @@ struct obs_source_info create_spout_filter_info()
 	win_spout_filter_info.update = win_spout_filter_update;
 	win_spout_filter_info.video_tick = win_spout_filter_tick;
 	win_spout_filter_info.video_render = win_spout_filter_videorender;
+	win_spout_filter_info.filter_remove = win_spout_filter_remove;
 
 	return win_spout_filter_info;
 }

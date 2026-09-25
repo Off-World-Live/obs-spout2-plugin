@@ -63,11 +63,8 @@
 					<widget class="QCheckBox" name="checkBox_continuous">
 						<property name="toolTip">
 							<string>When enabled, Spout output filters broadcast continuously, even when their source is not in the active scene.
-
 This registers the sender right after a cold start, so receivers see it without opening the filter.
-
 The cost is some extra GPU for hidden sources.
-
 When disabled, the previous behaviour is kept: a filter only sends while its source is being rendered.</string>
 						</property>
 						<property name="text">
