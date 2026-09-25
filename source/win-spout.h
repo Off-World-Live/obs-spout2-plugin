@@ -14,5 +14,6 @@
 
 void spout_output_start(const char *SpoutName);
 void spout_output_stop();
+bool spout_output_is_active(void);
 
 #endif // WINSPOUT_H

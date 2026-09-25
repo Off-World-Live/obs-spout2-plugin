@@ -120,12 +120,20 @@ bool win_spout_output_start(void *data)
 
 	pthread_mutex_unlock(&context->mutex);
 
-	int32_t width = (int32_t)obs_output_get_width(output);
-	int32_t height = (int32_t)obs_output_get_height(output);
+	obs_output_set_media(output, obs_get_video(), obs_get_audio());
 
 	video_t *video = obs_output_video(output);
 	if (!video) {
 		blog(LOG_ERROR, "Trying to start with no video!");
+		return false;
+	}
+
+	const struct video_output_info *voi = video_output_get_info(video);
+	int32_t width = voi ? (int32_t)voi->width : (int32_t)obs_output_get_width(output);
+	int32_t height = voi ? (int32_t)voi->height : (int32_t)obs_output_get_height(output);
+
+	if (width <= 0 || height <= 0) {
+		blog(LOG_ERROR, "Trying to start with invalid video size %ix%i", width, height);
 		return false;
 	}
 
@@ -137,8 +145,12 @@ bool win_spout_output_start(void *data)
 	video_scale_info info{};
 	// we enforce BGRA format as it works well with spout
 	info.format = VIDEO_FORMAT_BGRA;
-	info.width = width;
-	info.height = height;
+	info.width = (uint32_t)width;
+	info.height = (uint32_t)height;
+	if (voi) {
+		info.colorspace = voi->colorspace;
+		info.range = voi->range;
+	}
 
 	obs_output_set_video_conversion(output, &info);
 
