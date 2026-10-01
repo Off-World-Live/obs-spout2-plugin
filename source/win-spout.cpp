@@ -48,6 +48,20 @@ static void spout_obs_event(enum obs_frontend_event event, void *)
 
 bool obs_module_load(void)
 {
+	// First line of every support log: both versions at a glance.
+	blog(LOG_INFO, "win-spout %s (built against libobs %d.%d.%d) loading on OBS %s", PLUGIN_VERSION,
+	     LIBOBS_API_MAJOR_VER, LIBOBS_API_MINOR_VER, LIBOBS_API_PATCH_VER, obs_get_version_string());
+
+	// Spout shares D3D11 textures; there is nothing we can do on the OpenGL renderer (#64).
+	obs_enter_graphics();
+	const int device_type = gs_get_device_type();
+	obs_leave_graphics();
+	if (device_type != GS_DEVICE_DIRECT3D_11) {
+		blog(LOG_ERROR, "win-spout requires the Direct3D 11 renderer. OBS is running with OpenGL "
+				"(--allow-opengl), so the Spout source, filter and output are not available");
+		return false;
+	}
+
 	// load spout - source
 	spout_source_info = create_spout_source_info();
 	obs_register_source(&spout_source_info);

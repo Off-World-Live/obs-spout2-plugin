@@ -88,6 +88,14 @@ jobs:
             done
           done
 
+      - name: Checkout buildspec 📋
+        if: fromJSON(steps.check.outputs.validTag)
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: buildspec.json
+          sparse-checkout-cone-mode: false
+          path: src
+
       - name: Generate Checksums 🪪
         if: fromJSON(steps.check.outputs.validTag)
         run: |
@@ -95,7 +103,19 @@ jobs:
           if [[ "${RUNNER_DEBUG}" ]]; then set -x; fi
           shopt -s extglob
 
-          echo "### Checksums" > ${{ github.workspace }}/CHECKSUMS.txt
+          obs_version="$(jq -r '.dependencies["obs-studio"].version' src/buildspec.json)"
+          min_obs="$(echo "${obs_version}" | sed -E 's/^([0-9]+)\.([0-9]+).*/\1.\2/')"
+
+          {
+            echo "### Requirements"
+            echo "Built against OBS Studio ${obs_version} — **requires OBS Studio ${min_obs} or newer**. Older OBS versions refuse to load it (\"The following OBS plugins failed to load: win-spout\")."
+            echo ""
+            echo "- \`OBS_Spout2_Plugin_Install_*.exe\`: installer for a standard OBS install (installs to \`C:\\ProgramData\\obs-studio\\plugins\\win-spout\`)"
+            echo "- \`*-windows-x64.zip\`: the same layout as the installer, for manual installs"
+            echo "- \`*-windows-x64-portable.zip\`: extract onto a portable OBS folder (\`obs-plugins\\64bit\` + \`data\\obs-plugins\\win-spout\`)"
+            echo ""
+            echo "### Checksums"
+          } > ${{ github.workspace }}/CHECKSUMS.txt
           for file in ${{ github.workspace }}/@(*.exe|*.deb|*.ddeb|*.pkg|*.tar.xz|*.zip); do
             echo "    ${file##*/}: $(sha256sum "${file}" | cut -d " " -f 1)" >> ${{ github.workspace }}/CHECKSUMS.txt
           done

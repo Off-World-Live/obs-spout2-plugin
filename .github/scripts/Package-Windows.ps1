@@ -72,6 +72,30 @@ function Package {
         Copy-Item -Path "${SpoutBinariesDir}/${Dll}" -Destination "${InstallRoot}/bin/64bit/${Dll}" -Force
     }
 
+    # libobs refuses modules compiled against a newer libobs major.minor than the running OBS,
+    # so tell zip users which OBS this build needs (the NSIS installer checks it at install time).
+    $ObsVersion = $BuildSpec.dependencies.'obs-studio'.version
+    if ( $ObsVersion -match '^(\d+)\.(\d+)' ) {
+        $MinObs = "$($Matches[1]).$($Matches[2])"
+    } else {
+        throw "Cannot parse obs-studio version '$ObsVersion' from buildspec.json"
+    }
+    $RequiresNote = @(
+        "${ProductName} ${ProductVersion} was built against OBS Studio ${ObsVersion}."
+        "It requires OBS Studio ${MinObs} or newer; older OBS versions will refuse to load it"
+        "('The following OBS plugins failed to load: win-spout')."
+        ""
+        "Standard zip: extract so that you get"
+        "  C:\ProgramData\obs-studio\plugins\${ProductName}\bin\64bit\${ProductName}.dll"
+        "  C:\ProgramData\obs-studio\plugins\${ProductName}\data\locale\en-US.ini"
+        ""
+        "Portable zip (-portable.zip): extract onto your OBS folder so that you get"
+        "  <OBS folder>\obs-plugins\64bit\${ProductName}.dll"
+        "  <OBS folder>\data\obs-plugins\${ProductName}\locale\en-US.ini"
+    ) -join "`r`n"
+    $RequiresFileName = "REQUIRES-OBS-${MinObs}.txt"
+    Set-Content -Path "${ProjectRoot}/release/${Configuration}/${RequiresFileName}" -Value $RequiresNote
+
     Log-Group "Archiving ${ProductName}..."
     $CompressArgs = @{
         Path = (Get-ChildItem -Path "${ProjectRoot}/release/${Configuration}" -Exclude "${OutputName}*.*", "${PortableOutputName}*.*")
@@ -95,6 +119,7 @@ function Package {
     if ( Test-Path "${InstallRoot}/data" ) {
         Copy-Item -Path "${InstallRoot}/data/*" -Destination $PortableDataPath -Recurse -Force
     }
+    Copy-Item -Path "${ProjectRoot}/release/${Configuration}/${RequiresFileName}" -Destination $PortableRoot -Force
 
     $PortableCompressArgs = @{
         Path = (Get-ChildItem -Path $PortableRoot)
