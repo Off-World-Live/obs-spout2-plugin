@@ -124,6 +124,7 @@ def cmd_recv(a: argparse.Namespace) -> int:
     last_digest = None
     first_img = last_img = None
     frame_first = frame_last = None
+    t_update = 0.0
     with SpoutGL.SpoutReceiver() as receiver:
         receiver.setReceiverName(a.name)
         while time.monotonic() < deadline and distinct < a.frames:
@@ -132,8 +133,15 @@ def cmd_recv(a: argparse.Namespace) -> int:
                 w, h = receiver.getSenderWidth(), receiver.getSenderHeight()
                 fmt = receiver.getSenderFormat()
                 buf = bytearray(w * h * 4)
+                t_update = time.monotonic()
                 continue
             if res and buf is not None and w > 0:
+                # Right after (re)connecting receiveImage can succeed before the shared texture has
+                # been copied, leaving the buffer all zero; ignore that for a short grace period so a
+                # genuinely black frame is still accepted later.
+                if time.monotonic() - t_update < 0.3 and buf.count(0) == len(buf):
+                    time.sleep(0.004)
+                    continue
                 reads += 1
                 digest = zlib.adler32(buf)
                 if digest != last_digest:

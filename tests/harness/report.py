@@ -20,6 +20,27 @@ SMALL_WIDTH = 640
 ORDER = {"failed": 0, "error": 1, "xpassed": 2, "xfailed": 3, "skipped": 4, "passed": 5}
 
 
+def checkerboard(pil, cell: int = 16):
+    """Composite an RGBA PIL image over a grey checkerboard (returns RGB)."""
+    from PIL import Image
+
+    if pil.mode != "RGBA":
+        return pil.convert("RGB")
+    w, h = pil.size
+    yy, xx = np.mgrid[0:h, 0:w]
+    light = ((xx // cell + yy // cell) % 2 == 0)
+    bg = np.where(light[..., None], 200, 150).astype(np.uint8).repeat(3, axis=2)
+    base = Image.fromarray(bg, "RGB")
+    base.paste(pil, (0, 0), pil)
+    return base
+
+
+def assertion_summary(longrepr: str, limit: int = 12) -> str:
+    """Only the 'E ' assertion lines (and the failing file:line) of a pytest longrepr."""
+    lines = [l for l in longrepr.splitlines() if l.startswith("E ") or re.match(r"^[\w./\\-]+\.py:\d+: ", l)]
+    return "\n".join(lines[-limit:]) if lines else longrepr[-1500:]
+
+
 def _safe(text: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]+", "_", text).strip("_")[:80]
 
@@ -67,7 +88,9 @@ class Artifacts:
         small = pil
         if pil.width > SMALL_WIDTH:
             small = pil.resize((SMALL_WIDTH, max(1, int(pil.height * SMALL_WIDTH / pil.width))))
-        small.save(small_path)
+        # The reading copy is flattened onto a checkerboard so a transparent (0,0,0,0) source is
+        # visibly different from a black one; the .full.png keeps the alpha channel.
+        checkerboard(small).save(small_path)
         self.images.append(entry)
         return small_path
 
@@ -192,6 +215,8 @@ class RunReport:
                     lines.append(f"reason: {r.reason}")
                 if r.message and (verbose or r.outcome == "skipped"):
                     msg = r.message.strip()
+                    if r.outcome in ("xfailed", "xpassed"):
+                        msg = assertion_summary(msg)
                     if len(msg) > 3000:
                         msg = msg[:3000] + "\n... (truncated)"
                     lines.append("")
