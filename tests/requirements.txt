@@ -1,0 +1,8 @@
+obsws-python>=1.7
+pillow>=10
+numpy>=1.26
+pytest>=8
+pytest-timeout>=2.3
+# Fallback Spout oracle used when tests/spout-tool is not built (OpenGL based).
+SpoutGL>=0.1.1
+PyOpenGL>=3.1

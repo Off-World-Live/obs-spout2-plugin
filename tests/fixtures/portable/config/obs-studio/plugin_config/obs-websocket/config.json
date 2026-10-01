@@ -1,0 +1,8 @@
+{
+  "alerts_enabled": false,
+  "auth_required": true,
+  "first_load": false,
+  "server_enabled": true,
+  "server_password": "obs-spout-test",
+  "server_port": 4466
+}
