@@ -1,0 +1,84 @@
+name: GPU Tests
+# Full OBS-in-the-loop harness (tests/). Needs a self-hosted Windows runner with a GPU and Spout:
+# register it on the dev box as a *logon* scheduled task in the console session (never as a
+# service: session 0 has no GPU/desktop), see tests/README.md. Hosted runners only run tests/unit.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * *'   # nightly, when the user's OBS is not open (run.ps1 -Install refuses otherwise)
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    branches: [master, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gpu-tests
+  cancel-in-progress: false
+
+jobs:
+  unit:
+    name: Harness unit tests (hosted) 🧪
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install harness requirements
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r tests/requirements.txt
+      - name: Run tests/unit
+        run: python -m pytest tests/unit -q --junitxml tests/results/unit-junit.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-junit
+          path: tests/results/unit-junit.xml
+
+  gpu:
+    name: OBS harness on the GPU runner 🖥️
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'gpu-tests'))
+    runs-on: [self-hosted, windows, gpu, spout]
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Harness environment (venv + portable OBS)
+        run: |
+          # Idempotent: creates tests/.venv and the portable OBS copy if they do not exist.
+          pwsh -NoProfile -File tests/setup-user.ps1 -MakePortable
+
+      - name: Build, install, test
+        id: run
+        run: |
+          pwsh -NoProfile -File tests/run.ps1 -Build -Install -Test
+          exit $LASTEXITCODE
+
+      - name: Restore the released plugin
+        if: always()
+        run: pwsh -NoProfile -File tests/run.ps1 -Restore
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gpu-test-results-${{ github.run_number }}
+          path: tests/results/**
+          if-no-files-found: warn
+
+# TODO: wire `tests/unit` into pr-pull.yaml / build-project.yaml once the hosted Windows job there
+# installs Python; for now the `unit` job above covers every PR event through this workflow.

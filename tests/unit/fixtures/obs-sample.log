@@ -1,0 +1,24 @@
+13:11:11.551: CPU Name: AMD Ryzen 9 9950X3D2 16-Core Processor
+13:11:11.553: Portable mode: true
+13:11:11.733: OBS 32.2.2 (64-bit, windows)
+13:11:11.740: Initializing D3D11...
+13:11:11.740: Available Video Adapters:
+13:11:11.754: 	Adapter 0: NVIDIA GeForce RTX 5090
+13:11:11.754: 	Adapter 1: AMD Radeon(TM) Graphics
+13:11:11.910: Failed to initialize module 'aja-output-ui.dll'
+13:11:12.178: [obs-websocket] [obs_module_load] you can haz websockets (Version: 5.7.4 | RPC Version: 1)
+13:11:12.191: warning: Failed to load 'en-GB' text for module: 'win-spout.dll'
+13:11:12.212: [win_spout] Opened DX11
+13:11:12.212: [win_spout] win-spout loaded!
+13:11:12.212:   Loaded Modules:
+13:11:12.212:     win-spout.dll
+13:11:12.212:     win-wasapi.dll
+13:11:12.212:     obs-websocket.dll
+13:11:12.212: ==== Startup complete ===============================================
+13:11:19.054: [win_spout] [(null)] initialising spout source
+13:11:19.076: [win_spout] [Spout2 Capture] No active Spout cameras
+13:11:19.076: [win_spout] [Spout2 Capture] Sender  has changed / gone away. Resetting
+13:11:20.001: error: [win_spout] something bad
+13:11:32.054: ==== Shutting down ==================================================
+13:11:32.222: [win_spout] win-spout unloaded!
+13:11:32.464: Number of memory leaks: 0
