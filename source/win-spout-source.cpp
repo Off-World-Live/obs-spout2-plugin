@@ -237,7 +237,8 @@ static void win_spout_source_receive(spout_source *context)
 				context->spout_status = -8;
 			}
 		} else if (had_texture) {
-			info("Sender %s has gone away", context->useFirstSender ? "(first available)" : context->senderName);
+			info("Sender %s has gone away",
+			     context->useFirstSender ? "(first available)" : context->senderName);
 			context->spout_status = -4;
 		} else if (!context->useFirstSender) {
 			if (context->spout_status != -5) {
