@@ -50,6 +50,13 @@ bool obs_module_load(void)
 {
 	// load spout - source
 	spout_source_info = create_spout_source_info();
+	if (obs_source_get_display_name(spout_source_info.id)) {
+		// libobs keeps the first registration, so ours would silently not appear (#56).
+		blog(LOG_ERROR,
+		     "another plugin already registered the source id '%s' (PRPR Live's prpr-library.dll is a known case); "
+		     "'Spout2 Capture' will be missing from the Sources list until that plugin is removed",
+		     spout_source_info.id);
+	}
 	obs_register_source(&spout_source_info);
 
 	// load spout output

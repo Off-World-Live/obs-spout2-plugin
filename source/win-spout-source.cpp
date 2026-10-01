@@ -136,18 +136,44 @@ static void win_spout_source_init(void *data, bool forced = false)
 		}
 	}
 
-	info("Getting info for sender %s", context->senderName);
+	// Every failure below leaves `initialized` false so the poll loop keeps retrying at
+	// tick_speed_limit; each message is logged once per failure kind (spout_status).
 	if (!win_spout_source_store_sender_info(context)) {
-		warn("Named %s sender not found", context->senderName);
-	} else {
-		info("Sender %s is of dimensions %d x %d", context->senderName, context->width, context->height);
-	};
+		if (context->spout_status != -6) {
+			warn("Named %s sender not found", context->senderName);
+			context->spout_status = -6;
+		}
+		return;
+	}
+
+	if (!context->dxHandle) {
+		if (context->spout_status != -7) {
+			warn("Sender %s has no DirectX share handle (memory-share or DirectX 9 sender?), it cannot be captured",
+			     context->senderName);
+			context->spout_status = -7;
+		}
+		return;
+	}
 
 	obs_enter_graphics();
 	gs_texture_destroy(context->texture);
 	context->texture = gs_texture_open_shared((uint32_t)(uintptr_t)context->dxHandle);
 	obs_leave_graphics();
 
+	if (!context->texture) {
+		if (context->spout_status != -8) {
+			warn("Could not open the shared texture of sender %s (handle 0x%p, DXGI format %lu). "
+			     "This usually means the sender is running on a different GPU than OBS: in Windows "
+			     "Settings > System > Display > Graphics set both OBS and the sender to the same GPU. "
+			     "Retrying in the background.",
+			     context->senderName, context->dxHandle, (unsigned long)context->dxFormat);
+			context->spout_status = -8;
+		}
+		return;
+	}
+
+	info("Sender %s is of dimensions %d x %d", context->senderName, context->width, context->height);
+	context->spout_status = 0;
 	context->initialized = true;
 }
 
@@ -200,9 +226,9 @@ static const char *win_spout_source_get_name(void *unused)
 static void *win_spout_source_create(obs_data_t *settings, obs_source_t *source)
 {
 	struct spout_source *context = (spout_source *)bzalloc(sizeof(spout_source));
+	context->source = source;
 	info("initialising spout source");
 	context->spout_receiver_ptr = GetSpout();
-	context->source = source;
 	context->useFirstSender = true;
 	context->initialized = false;
 	context->tick_speed_limit = 0;
