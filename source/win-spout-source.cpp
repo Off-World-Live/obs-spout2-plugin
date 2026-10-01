@@ -235,7 +235,10 @@ static void win_spout_source_destroy(void *data)
 static void win_spout_source_defaults(obs_data_t *settings)
 {
 	obs_data_set_default_string(settings, SPOUT_SENDER_LIST, USE_FIRST_AVAILABLE_SENDER);
-	obs_data_set_default_int(settings, "tickspeedlimit", 100);
+	obs_data_set_default_int(settings, SPOUT_TICK_SPEED_LIMIT, 100);
+	// Without a default the combo box showed nothing selected while rendering opaque
+	// (the switch's fallback); make that explicit so the UI matches the behaviour.
+	obs_data_set_default_int(settings, SPOUT_COMPOSITE_MODE, COMPOSITE_MODE_OPAQUE);
 }
 
 static void win_spout_source_show(void *data)
@@ -309,9 +312,25 @@ static void win_spout_source_render(void *data, gs_effect_t *effect)
 		break;
 	}
 
+	// On a linear canvas (10-bit / HDR colour formats) OBS renders sRGB-aware sources with
+	// gs_get_linear_srgb() set; sample the shared texture through its sRGB view and write
+	// into an sRGB framebuffer, exactly as the filter does. Writing the 8-bit sRGB bytes
+	// straight into a linear target gave the washed-out, too-bright picture of #75.
+	gs_texture_t *tex = context->texture;
+	gs_eparam_t *image = gs_effect_get_param_by_name(effect, "image");
+	const bool linear_srgb = gs_get_linear_srgb();
+	const bool previous = gs_framebuffer_srgb_enabled();
+	gs_enable_framebuffer_srgb(linear_srgb);
+	if (linear_srgb)
+		gs_effect_set_texture_srgb(image, tex);
+	else
+		gs_effect_set_texture(image, tex);
+
 	while (gs_effect_loop(effect, "Draw")) {
-		obs_source_draw(context->texture, 0, 0, 0, 0, false);
+		gs_draw_sprite(tex, 0, 0, 0);
 	}
+
+	gs_enable_framebuffer_srgb(previous);
 
 	if (context->composite_mode == COMPOSITE_MODE_PREMULTIPLIED) {
 		gs_blend_state_pop();
@@ -395,7 +414,7 @@ static obs_properties_t *win_spout_properties(void *data)
 
 	obs_properties_t *props = obs_properties_create();
 
-	obs_property_t *sender_list = obs_properties_add_list(props, SPOUT_SENDER_LIST, obs_module_text("SpoutSenders"),
+	obs_property_t *sender_list = obs_properties_add_list(props, SPOUT_SENDER_LIST, obs_module_text("spoutsenders"),
 							      OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
 
 	fill_senders(context->spout_receiver_ptr, sender_list);
@@ -425,7 +444,7 @@ struct obs_source_info create_spout_source_info()
 	struct obs_source_info spout_source_info = {};
 	spout_source_info.id = "spout_capture";
 	spout_source_info.type = OBS_SOURCE_TYPE_INPUT;
-	spout_source_info.output_flags = OBS_SOURCE_VIDEO | OBS_SOURCE_CUSTOM_DRAW;
+	spout_source_info.output_flags = OBS_SOURCE_VIDEO | OBS_SOURCE_CUSTOM_DRAW | OBS_SOURCE_SRGB;
 	spout_source_info.get_name = win_spout_source_get_name;
 	spout_source_info.create = win_spout_source_create;
 	spout_source_info.destroy = win_spout_source_destroy;
