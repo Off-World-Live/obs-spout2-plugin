@@ -10,6 +10,7 @@
 #include <obs-module.h>
 #include <obs-frontend-api.h>
 #include <sys/stat.h>
+#include <util/platform.h>
 #include <QAction>
 #include <QMainWindow>
 
@@ -33,16 +34,53 @@ struct obs_source_info spout_filter_info;
 win_spout_output_settings *spout_output_settings;
 obs_output_t *win_spout_out;
 
+// Set while a profile switch is in flight so the output can be restarted afterwards (#66).
+static bool restart_output_after_profile_change = false;
+
 static void spout_obs_event(enum obs_frontend_event event, void *)
 {
-	if (event == OBS_FRONTEND_EVENT_EXIT) {
-		if (!win_spout_out) {
-			return;
-		}
+	if (!win_spout_out) {
+		return;
+	}
 
+	switch (event) {
+	case OBS_FRONTEND_EVENT_FINISHED_LOADING: {
+		// AutoStart has to happen here, not when the Tools dialog is opened (#80, #92).
+		win_spout_config *config = win_spout_config::get();
+		blog(LOG_INFO, "auto_start=%s (user.ini [win_spout])", config->auto_start ? "true" : "false");
+		if (config->auto_start) {
+			spout_output_start(config->spout_output_name.toUtf8().constData());
+		}
+		break;
+	}
+	case OBS_FRONTEND_EVENT_PROFILE_CHANGING:
+		// A running raw output blocks obs_reset_video(), which left the canvas at the
+		// previous profile's size until OBS was restarted (#66). Stop it for the switch.
+		restart_output_after_profile_change = obs_output_active(win_spout_out);
+		if (restart_output_after_profile_change) {
+			blog(LOG_INFO, "stopping Spout output for profile change");
+			spout_output_stop();
+			// Deactivation of a raw output finishes on a helper thread; give it a moment
+			// so the profile's video reset is not refused as "currently active".
+			for (int i = 0; i < 100 && obs_video_active(); i++) {
+				os_sleep_ms(10);
+			}
+		}
+		break;
+	case OBS_FRONTEND_EVENT_PROFILE_CHANGED:
+		if (restart_output_after_profile_change) {
+			restart_output_after_profile_change = false;
+			blog(LOG_INFO, "restarting Spout output after profile change");
+			spout_output_start(win_spout_config::get()->spout_output_name.toUtf8().constData());
+		}
+		break;
+	case OBS_FRONTEND_EVENT_EXIT:
 		obs_output_stop(win_spout_out);
 		obs_output_release(win_spout_out);
 		win_spout_out = nullptr;
+		break;
+	default:
+		break;
 	}
 }
 
@@ -114,16 +152,41 @@ const char *obs_module_description()
 	return "Spout input/output for OBS Studio";
 }
 
-void spout_output_start(const char *SpoutName)
+bool spout_output_start(const char *SpoutName)
 {
+	if (!win_spout_out) {
+		return false;
+	}
+	if (obs_output_active(win_spout_out)) {
+		blog(LOG_INFO, "Spout output already running");
+		return true;
+	}
+
 	obs_data_t *settings = obs_output_get_settings(win_spout_out);
 	obs_data_set_string(settings, "senderName", SpoutName);
 	obs_output_update(win_spout_out, settings);
 	obs_data_release(settings);
-	obs_output_start(win_spout_out);
+
+	// obs_output_create() captured the video/audio handles that existed at module load.
+	// Every obs_reset_video() (profile switch, Settings > Video) replaces them, so point the
+	// output at the current ones before starting or we hand libobs a dangling video_t.
+	obs_output_set_media(win_spout_out, obs_get_video(), obs_get_audio());
+
+	if (!obs_output_start(win_spout_out)) {
+		blog(LOG_ERROR, "Failed to start Spout output '%s'", SpoutName);
+		return false;
+	}
+	return true;
 }
 
 void spout_output_stop()
 {
-	obs_output_stop(win_spout_out);
+	if (win_spout_out) {
+		obs_output_stop(win_spout_out);
+	}
+}
+
+bool spout_output_active()
+{
+	return win_spout_out && obs_output_active(win_spout_out);
 }

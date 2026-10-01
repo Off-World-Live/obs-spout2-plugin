@@ -16,7 +16,8 @@
 struct spout_output {
 	spoutDX *sender;
 	obs_output_t *output;
-	const char *senderName;
+	// Owned copy: the obs_data string handed to update() is freed when the settings change.
+	char senderName[256];
 	bool output_started;
 	// mutex guards accesses to rest of context variables,
 	// and any methods on spoutDX* sender.
@@ -54,14 +55,16 @@ static const char *win_spout_output_get_name(void *unused)
 static void win_spout_output_update(void *data, obs_data_t *settings)
 {
 	spout_output *context = (spout_output *)data;
-	context->senderName = obs_data_get_string(settings, "senderName");
+	pthread_mutex_lock(&context->mutex);
+	strncpy(context->senderName, obs_data_get_string(settings, "senderName"), sizeof(context->senderName) - 1);
+	context->senderName[sizeof(context->senderName) - 1] = '\0';
+	pthread_mutex_unlock(&context->mutex);
 }
 
 static void *win_spout_output_create(obs_data_t *settings, obs_output_t *output)
 {
 	spout_output *context = (spout_output *)bzalloc(sizeof(spout_output));
 	context->output = output;
-	context->senderName = obs_data_get_string(settings, "senderName");
 	context->output_started = false;
 	context->sender = new spoutDX;
 
@@ -113,7 +116,6 @@ bool win_spout_output_start(void *data)
 
 	pthread_mutex_lock(&context->mutex);
 
-	const char *senderName = context->senderName;
 	context->sender->SetSenderName(context->senderName);
 
 	obs_output_t *output = context->output;
