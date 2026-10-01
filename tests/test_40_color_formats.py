@@ -47,10 +47,11 @@ def measure(obs_manager, senders, run_dir, profile: str) -> dict:
     assert spout_tool.wait_for_sender(OUT, timeout=5.0)
     r = spout_tool.receive(OUT, frames=3, timeout=4.0, out=run_dir / f"tmp-40-{profile}.png")
     program = client.screenshot()
-    client.output_stop()
-    client.clear()
+    still_active = client.output_active()
+    client.clear()  # stops the output (if still active) and removes the sources
     img = r.pop("image")
     assert r["connected"] and img is not None, f"no output frame received in profile {profile}: {r}"
+    assert still_active, f"[{profile}] the Tools output stopped by itself while being received"
     bars = {}
     for name, (_, x) in BARS.items():
         bars[name] = pattern.mean_rgba(img, pattern.inner((x, 0, x + BAR_W, BAR_H)))[:3]
@@ -68,24 +69,29 @@ def _attach(artifacts, m, profile):
     artifacts.image(f"program-{profile}", m["program"])
 
 
+# Measured with 1.12.0 on OBS 32.2.2 (see tests/README.md): the raw_video output path receives
+# frames *after* OBS's output colour conversion, so partial-range 8-bit canvases come back
+# 124/126 instead of 128 and a PQ canvas is not tone-mapped at all (grey 117, white 157).
 OUTPUT_LEVEL_PARAMS = [
     "bgra",
-    "nv12-partial",
+    xf("nv12-partial", "#84: Tools output content depends on the canvas colour format (partial range off by ~4)"),
     "nv12-full",
-    "i444",
+    xf("i444", "#84: Tools output content depends on the canvas colour format (partial range off by ~4)"),
     "p010-709",
-    "p010-2100pq",
+    xf("p010-2100pq", "#84: Tools output sends the PQ-encoded canvas untouched (grey 117, white 157)"),
     "i010-709",
 ]
 
+# The receiver draws its sRGB texture without OBS_SOURCE_SRGB handling, so on linear (10-bit)
+# canvases the 50 % grey pattern arrives as ~186 (#75). On the PQ canvas it is the #84 path.
 RECEIVER_PARAMS = [
     "bgra",
     "nv12-partial",
     "nv12-full",
     "i444",
-    "p010-709",
-    "p010-2100pq",
-    "i010-709",
+    xf("p010-709", "#75: receiver too bright on 10-bit canvases (grey 128 -> 186)"),
+    xf("p010-2100pq", "#75/#84: receiver on a PQ canvas (grey 128 -> 117 through the untonemapped output)"),
+    xf("i010-709", "#75: receiver too bright on 10-bit canvases (grey 128 -> 186)"),
 ]
 
 

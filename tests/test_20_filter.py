@@ -71,16 +71,28 @@ def test_filter_disabled_stops(scene, senders, artifacts):
     assert moving, f"filter did not resume after re-enable: {r}"
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason="unreported (found by this harness, related to #36/#79): once rendered, the filter keeps broadcasting "
+    "off-program and while the scene item is hidden because win_spout_offscreen_render renders the parent "
+    "through its own filter chain, which re-enters win_spout_filter_videorender and re-sets is_active",
+)
 def test_filter_stops_when_source_off_program(scene, senders, artifacts):
-    """continuous_broadcast=false (default): a source that is not on program stops broadcasting."""
+    """continuous_broadcast=false (default): a source that is not on program should stop broadcasting."""
     _chain(scene, senders)
     scene.create_scene("Other")
     scene.set_current_scene("Other")
     time.sleep(1.0)
     moving, r = _advancing(F, frames=4, timeout=1.5)
     artifacts.value("off_program", (r["pattern_first"], r["pattern_last"], r["distinct_frames"]))
-    assert not moving, f"filter kept broadcasting off-program with continuous_broadcast=false: {r}"
     scene.set_current_scene(paths.SCENE_NAME)
+    scene.set_item_enabled("RX", False)
+    time.sleep(1.0)
+    moving_hidden, r2 = _advancing(F, frames=4, timeout=1.5)
+    artifacts.value("item_hidden", (r2["pattern_first"], r2["pattern_last"], r2["distinct_frames"]))
+    scene.set_item_enabled("RX", True)
+    assert not moving, f"filter kept broadcasting off-program with continuous_broadcast=false: {r}"
+    assert not moving_hidden, f"filter kept broadcasting while the scene item was hidden: {r2}"
     time.sleep(0.5)
     moving, r = _advancing(F)
     assert moving, f"filter did not resume when back on program: {r}"
