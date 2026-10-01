@@ -12,7 +12,9 @@
 
 #define blog(log_level, message, ...) blog(log_level, "[win_spout] " message, ##__VA_ARGS__)
 
-void spout_output_start(const char *SpoutName);
+// Start/stop the Tools-menu Spout output. Start returns false if libobs refused to start it.
+bool spout_output_start(const char *SpoutName);
 void spout_output_stop();
+bool spout_output_active();
 
 #endif // WINSPOUT_H

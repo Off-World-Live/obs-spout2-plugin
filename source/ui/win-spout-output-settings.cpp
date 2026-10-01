@@ -31,9 +31,15 @@ win_spout_output_settings::win_spout_output_settings(QWidget *parent)
 	ui->checkBox_continuous->setChecked(config->continuous_broadcast);
 	ui->lineEdit_spoutname->setText(config->spout_output_name);
 
-	set_started_button_state(true);
-	if (config->auto_start)
-		on_start();
+	// Persist as soon as the user changes something, not only when the dialog closes,
+	// so AutoStart reflects the last click even if OBS exits uncleanly.
+	connect(ui->checkBox_auto, &QCheckBox::toggled, this, [this](bool) { save_settings(); });
+	connect(ui->checkBox_continuous, &QCheckBox::toggled, this, [this](bool) { save_settings(); });
+	connect(ui->lineEdit_spoutname, &QLineEdit::editingFinished, this, [this]() { save_settings(); });
+
+	// The output keeps running after this dialog is closed, and AutoStart is handled at
+	// OBS_FRONTEND_EVENT_FINISHED_LOADING, so just reflect the real state here (#80).
+	set_started_button_state(!spout_output_active());
 }
 
 void win_spout_output_settings::save_settings()
@@ -57,19 +63,20 @@ win_spout_output_settings::~win_spout_output_settings()
 void win_spout_output_settings::on_start()
 {
 	QByteArray spout_output_name = ui->lineEdit_spoutname->text().toUtf8();
-	set_started_button_state(false);
 	save_settings();
-	spout_output_start(spout_output_name);
+	const bool started = spout_output_start(spout_output_name.constData());
+	set_started_button_state(!started);
 }
 
 void win_spout_output_settings::on_stop()
 {
-	set_started_button_state(true);
 	spout_output_stop();
+	set_started_button_state(true);
 }
 
-void win_spout_output_settings::set_started_button_state(bool started)
+// `can_start` == true enables Start (output stopped); false enables Stop (output running).
+void win_spout_output_settings::set_started_button_state(bool can_start)
 {
-	ui->pushButton_start->setEnabled(started);
-	ui->pushButton_stop->setEnabled(!started);
+	ui->pushButton_start->setEnabled(can_start);
+	ui->pushButton_stop->setEnabled(!can_start);
 }
