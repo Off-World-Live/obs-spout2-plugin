@@ -31,9 +31,7 @@ win_spout_output_settings::win_spout_output_settings(QWidget *parent)
 	ui->checkBox_continuous->setChecked(config->continuous_broadcast);
 	ui->lineEdit_spoutname->setText(config->spout_output_name);
 
-	set_started_button_state(true);
-	if (config->auto_start)
-		on_start();
+	set_started_button_state(!spout_output_is_active());
 }
 
 void win_spout_output_settings::save_settings()

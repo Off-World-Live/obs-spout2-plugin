@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 #include <QAction>
 #include <QMainWindow>
+#include <QTimer>
 
 #include "win-spout.h"
 #include "ui/win-spout-output-settings.h"
@@ -33,9 +34,69 @@ struct obs_source_info spout_filter_info;
 win_spout_output_settings *spout_output_settings;
 obs_output_t *win_spout_out;
 
+static bool loading_done = false;
+static bool start_pending = false;
+static QByteArray pending_name;
+
+bool spout_output_is_active(void)
+{
+	return win_spout_out && obs_output_active(win_spout_out);
+}
+
+static void spout_output_start_now(const char *SpoutName)
+{
+	if (!SpoutName || !*SpoutName) {
+		return;
+	}
+
+	if (!win_spout_out) {
+		obs_data_t *settings = obs_data_create();
+		win_spout_out = obs_output_create("spout_output", "OBS Spout Output", settings, NULL);
+		obs_data_release(settings);
+	}
+
+	if (!win_spout_out || obs_output_active(win_spout_out)) {
+		return;
+	}
+
+	obs_data_t *settings = obs_output_get_settings(win_spout_out);
+	obs_data_set_string(settings, "senderName", SpoutName);
+	obs_output_update(win_spout_out, settings);
+	obs_data_release(settings);
+
+	obs_output_start(win_spout_out);
+}
+
+static void spout_run_pending_start()
+{
+	win_spout_config *config = win_spout_config::get();
+
+	if (start_pending) {
+		start_pending = false;
+		spout_output_start_now(pending_name.constData());
+		return;
+	}
+
+	if (!config->auto_start) {
+		return;
+	}
+
+	QByteArray name = config->spout_output_name.toUtf8();
+	spout_output_start_now(name.constData());
+}
+
 static void spout_obs_event(enum obs_frontend_event event, void *)
 {
-	if (event == OBS_FRONTEND_EVENT_EXIT) {
+	if (event == OBS_FRONTEND_EVENT_FINISHED_LOADING) {
+		loading_done = true;
+		QMainWindow *main_window = (QMainWindow *)obs_frontend_get_main_window();
+		if (!main_window) {
+			spout_run_pending_start();
+			return;
+		}
+
+		QTimer::singleShot(0, main_window, []() { spout_run_pending_start(); });
+	} else if (event == OBS_FRONTEND_EVENT_EXIT) {
 		if (!win_spout_out) {
 			return;
 		}
@@ -58,10 +119,6 @@ bool obs_module_load(void)
 
 	spout_output_info = create_spout_output_info();
 	obs_register_output(&spout_output_info);
-
-	obs_data_t *settings = obs_data_create();
-	win_spout_out = obs_output_create("spout_output", "OBS Spout Output", settings, NULL);
-	obs_data_release(settings);
 
 	QAction *menu_action = (QAction *)obs_frontend_add_tools_menu_qaction(obs_module_text("toolslabel"));
 
@@ -116,11 +173,17 @@ const char *obs_module_description()
 
 void spout_output_start(const char *SpoutName)
 {
-	obs_data_t *settings = obs_output_get_settings(win_spout_out);
-	obs_data_set_string(settings, "senderName", SpoutName);
-	obs_output_update(win_spout_out, settings);
-	obs_data_release(settings);
-	obs_output_start(win_spout_out);
+	if (!SpoutName || !*SpoutName) {
+		return;
+	}
+
+	if (!loading_done) {
+		pending_name = SpoutName;
+		start_pending = true;
+		return;
+	}
+
+	spout_output_start_now(SpoutName);
 }
 
 void spout_output_stop()

@@ -16,6 +16,8 @@
 #define PARAM_AUTO_START "auto_start"
 #define PARAM_SPOUT_OUTPUT_NAME "spout_output_name"
 #define PARAM_CONTINUOUS_BROADCAST "continuous_broadcast"
+#define PARAM_CONFIG_VERSION "config_version"
+#define CURRENT_CONFIG_VERSION 1
 
 win_spout_config *win_spout_config::_instance = nullptr;
 
@@ -28,6 +30,7 @@ win_spout_config::win_spout_config() : auto_start(false), spout_output_name("OBS
 		config_set_default_string(obs_config, SECTION_NAME, PARAM_SPOUT_OUTPUT_NAME,
 					  spout_output_name.toUtf8().constData());
 		config_set_default_bool(obs_config, SECTION_NAME, PARAM_CONTINUOUS_BROADCAST, continuous_broadcast);
+		config_set_default_int(obs_config, SECTION_NAME, PARAM_CONFIG_VERSION, 0);
 	}
 }
 
@@ -38,6 +41,14 @@ void win_spout_config::load()
 		auto_start = config_get_bool(obs_config, SECTION_NAME, PARAM_AUTO_START);
 		spout_output_name = config_get_string(obs_config, SECTION_NAME, PARAM_SPOUT_OUTPUT_NAME);
 		continuous_broadcast = config_get_bool(obs_config, SECTION_NAME, PARAM_CONTINUOUS_BROADCAST);
+
+		const int version = (int)config_get_int(obs_config, SECTION_NAME, PARAM_CONFIG_VERSION);
+		if (version < CURRENT_CONFIG_VERSION) {
+			auto_start = false;
+			config_set_int(obs_config, SECTION_NAME, PARAM_CONFIG_VERSION, CURRENT_CONFIG_VERSION);
+			config_set_bool(obs_config, SECTION_NAME, PARAM_AUTO_START, false);
+			config_save(obs_config);
+		}
 	}
 }
 
