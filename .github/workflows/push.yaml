@@ -22,14 +22,120 @@ jobs:
     name: Build Project 🧱
     uses: ./.github/workflows/build-project.yaml
     secrets: inherit
+    with:
+      sign: ${{ github.ref_type == 'tag' }}
     permissions:
       contents: read
+
+  # Runs only for tags, only on the self-hosted runner labelled `signer`, and only after a
+  # maintainer approves the deployment to the `release` environment.
+  sign-windows:
+    name: Sign Windows Binaries 🔏
+    if: github.ref_type == 'tag'
+    runs-on: [self-hosted, signer]
+    needs: build-project
+    environment: release
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      CONFIG: ${{ needs.build-project.outputs.config }}
+      SIGNING_CERT_NAME: ${{ secrets.WINDOWS_SIGNING_CERT_NAME }}
+      SIGNING_TIMESTAMP_URL: ${{ vars.WINDOWS_SIGNING_TIMESTAMP_URL || 'http://timestamp.digicert.com' }}
+      SIGNING_MACHINE_STORE: ${{ vars.WINDOWS_SIGNING_CERT_STORE == 'machine' }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      - name: Set Up Environment 🔧
+        id: setup
+        run: |
+          # Set Up Environment 🔧
+          if ( $Env:RUNNER_DEBUG -ne $null ) {
+            Set-PSDebug -Trace 1
+          }
+
+          if ( ! $Env:SIGNING_CERT_NAME ) {
+            throw 'WINDOWS_SIGNING_CERT_NAME secret is not set'
+          }
+
+          $BuildSpec = Get-Content -Path buildspec.json -Raw | ConvertFrom-Json
+          $ProductName = $BuildSpec.name
+          $ProductVersion = $BuildSpec.version
+
+          if ( '${{ github.ref_name }}' -match '^[0-9]+\.[0-9]+\.[0-9]+(-(beta|rc)[0-9]*)?$' ) {
+            $ProductVersion = '${{ github.ref_name }}'
+            $BuildSpec.version = $ProductVersion
+            $BuildSpec | ConvertTo-Json -Depth 8 | Set-Content -Path buildspec.json
+          }
+
+          "pluginName=${ProductName}" >> $env:GITHUB_OUTPUT
+          "pluginVersion=${ProductVersion}" >> $env:GITHUB_OUTPUT
+
+      - name: Download Unsigned Binaries 📥
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ${{ needs.build-project.outputs.windowsUnsignedArtifact }}
+          path: ${{ github.workspace }}
+
+      - name: Sign Binaries 🔏
+        run: |
+          # Sign Binaries 🔏
+          $Files = @(
+            "release/${Env:CONFIG}/${{ steps.setup.outputs.pluginName }}/bin/64bit/${{ steps.setup.outputs.pluginName }}.dll"
+            'deps/Spout2/BUILD/Binaries/x64/Spout.dll'
+            'deps/Spout2/BUILD/Binaries/x64/SpoutDX.dll'
+            'deps/Spout2/BUILD/Binaries/x64/SpoutLibrary.dll'
+          )
+
+          .github/scripts/Sign-Windows.ps1 -CertificateName $Env:SIGNING_CERT_NAME -Path $Files `
+            -TimestampUrl $Env:SIGNING_TIMESTAMP_URL -MachineStore:($Env:SIGNING_MACHINE_STORE -eq 'true')
+
+      - name: Package Plugin 📀
+        run: |
+          # Package Plugin 📀
+          .github/scripts/Package-Windows.ps1 -Target x64 -Configuration $Env:CONFIG
+
+          $NSIS = (Get-Command -Name makensis.exe -ErrorAction SilentlyContinue).Source
+          if ( ! $NSIS ) {
+            $NSIS = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
+          }
+          if ( ! ( Test-Path $NSIS ) ) {
+            throw 'makensis.exe not found. Install NSIS on the signing runner.'
+          }
+
+          .github/scripts/BuildInstaller.ps1 -Version ${{ steps.setup.outputs.pluginVersion }} -Configuration $Env:CONFIG -NSISPath $NSIS
+
+      - name: Sign Installer 🔏
+        run: |
+          # Sign Installer 🔏
+          .github/scripts/Sign-Windows.ps1 -CertificateName $Env:SIGNING_CERT_NAME `
+            -Path 'release/OBS_Spout2_Plugin_Install_v${{ steps.setup.outputs.pluginVersion }}.exe' `
+            -TimestampUrl $Env:SIGNING_TIMESTAMP_URL -MachineStore:($Env:SIGNING_MACHINE_STORE -eq 'true')
+
+      - name: Upload Signed Artifacts 📡
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ needs.build-project.outputs.windowsArtifact }}
+          overwrite: true
+          path: |
+            ${{ github.workspace }}/release/${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-windows-x64*.*
+            ${{ github.workspace }}/release/OBS_Spout2_Plugin_Install_v${{ steps.setup.outputs.pluginVersion }}.exe
+
+      - name: Clean Up 🧹
+        if: always()
+        run: |
+          # Clean Up 🧹
+          Remove-Item -Path release, deps/Spout2/BUILD -Recurse -Force -ErrorAction SilentlyContinue
 
   create-release:
     name: Create Release 🛫
     if: github.ref_type == 'tag'
     runs-on: ubuntu-24.04
-    needs: build-project
+    needs: [build-project, sign-windows]
     defaults:
       run:
         shell: bash
