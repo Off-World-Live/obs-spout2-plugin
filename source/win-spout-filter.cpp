@@ -103,8 +103,8 @@ obs_properties_t *win_spout_filter_getproperties(void *unused)
 	obs_properties_t *props = obs_properties_create();
 	obs_properties_set_flags(props, OBS_PROPERTIES_DEFER_UPDATE);
 	obs_properties_add_text(props, FILTER_PROP_NAME, obs_module_text("spoutname"), OBS_TEXT_DEFAULT);
-	obs_properties_add_button(props, "win_spout_apply", obs_module_text("changename"),
-				  win_spout_filter_change_name);
+	obs_properties_add_button2(props, "win_spout_apply", obs_module_text("changename"),
+				   win_spout_filter_change_name, NULL);
 	return props;
 }
 
