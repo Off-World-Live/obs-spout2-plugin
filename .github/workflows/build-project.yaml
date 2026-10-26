@@ -1,10 +1,24 @@
 name: Build Project
 on:
   workflow_call:
+    inputs:
+      sign:
+        description: Upload unsigned Windows binaries for the release signing job
+        type: boolean
+        default: false
     outputs:
       pluginName:
         description: Project name detected by parsing build spec file
         value: ${{ jobs.check-event.outputs.pluginName }}
+      config:
+        description: Build configuration
+        value: ${{ jobs.check-event.outputs.config }}
+      windowsArtifact:
+        description: Name of the packaged Windows artifact
+        value: ${{ jobs.windows-build.outputs.artifact }}
+      windowsUnsignedArtifact:
+        description: Name of the unsigned Windows binaries artifact (only uploaded when sign is true)
+        value: ${{ jobs.windows-build.outputs.unsignedArtifact }}
 jobs:
   check-event:
     name: Check GitHub Event Data 🔎
@@ -75,6 +89,9 @@ jobs:
     name: Build for Windows 🪟
     runs-on: windows-2022
     needs: check-event
+    outputs:
+      artifact: ${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-windows-x64-${{ needs.check-event.outputs.commitHash }}
+      unsignedArtifact: ${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-unsigned-x64-${{ needs.check-event.outputs.commitHash }}
     defaults:
       run:
         shell: pwsh
@@ -127,3 +144,12 @@ jobs:
           path: |
             ${{ github.workspace }}/release/${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-windows-x64*.*
             ${{ github.workspace }}/release/OBS_Spout2_Plugin_Install_v${{ steps.setup.outputs.pluginVersion }}.exe
+
+      - name: Upload Unsigned Binaries 📡
+        if: inputs.sign
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-unsigned-x64-${{ needs.check-event.outputs.commitHash }}
+          path: |
+            ${{ github.workspace }}/release/${{ needs.check-event.outputs.config }}
+            ${{ github.workspace }}/deps/Spout2/BUILD/Binaries/x64/*.dll
