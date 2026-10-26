@@ -85,7 +85,7 @@ jobs:
         run: |
           # Sign Binaries 🔏
           $Files = @(
-            "release/${Env:CONFIG}/${{ steps.setup.outputs.pluginName }}/bin/64bit/${{ steps.setup.outputs.pluginName }}.dll"
+            "release/${Env:CONFIG}/${{ steps.setup.outputs.pluginName }}/${{ steps.setup.outputs.pluginName }}.dll"
             'deps/Spout2/BUILD/Binaries/x64/Spout.dll'
             'deps/Spout2/BUILD/Binaries/x64/SpoutDX.dll'
             'deps/Spout2/BUILD/Binaries/x64/SpoutLibrary.dll'

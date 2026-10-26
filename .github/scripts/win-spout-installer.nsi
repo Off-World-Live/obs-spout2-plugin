@@ -44,9 +44,30 @@ Section "Spout 2 OBS Plugin" Section1
 	SetOverwrite on
 	AllowSkipFiles off
 
+	; Remove files left by older versions in legacy plugin locations. OBS 33 flags
+	; plugins there as Legacy and future versions will stop loading them.
+	; Legacy ProgramData layout: <plugin dir>\bin\64bit
+	Delete "$INSTDIR\bin\64bit\win-spout.dll"
+	Delete "$INSTDIR\bin\64bit\win-spout.pdb"
+	Delete "$INSTDIR\bin\64bit\Spout.dll"
+	Delete "$INSTDIR\bin\64bit\SpoutDX.dll"
+	Delete "$INSTDIR\bin\64bit\SpoutLibrary.dll"
+	RMDir "$INSTDIR\bin\64bit"
+	RMDir "$INSTDIR\bin"
+	; Legacy Program Files layout used by older installers. Only remove the Spout
+	; runtime DLLs when our plugin is present so other plugins keep theirs.
+	IfFileExists "$PROGRAMFILES64\obs-studio\obs-plugins\64bit\win-spout.dll" 0 legacy_program_files_done
+		Delete "$PROGRAMFILES64\obs-studio\obs-plugins\64bit\Spout.dll"
+		Delete "$PROGRAMFILES64\obs-studio\obs-plugins\64bit\SpoutDX.dll"
+		Delete "$PROGRAMFILES64\obs-studio\obs-plugins\64bit\SpoutLibrary.dll"
+		Delete "$PROGRAMFILES64\obs-studio\obs-plugins\64bit\win-spout.dll"
+	legacy_program_files_done:
+	Delete "$PROGRAMFILES64\obs-studio\obs-plugins\uninstall-spout2-plugin.exe"
+	RMDir /r "$PROGRAMFILES64\obs-studio\data\obs-plugins\win-spout"
+
 	; Set Section Files and Shortcuts
-	SetOutPath "$INSTDIR\bin\64bit"
-  File "..\..\${RELEASEDIR}\win-spout\bin\64bit\win-spout.dll"
+	SetOutPath "$INSTDIR"
+	File "..\..\${RELEASEDIR}\win-spout\win-spout.dll"
 	File "..\..\deps\Spout2\BUILD\Binaries\x64\Spout.dll"
 	File "..\..\deps\Spout2\BUILD\Binaries\x64\SpoutDX.dll"
 	File "..\..\deps\Spout2\BUILD\Binaries\x64\SpoutLibrary.dll"
@@ -96,10 +117,10 @@ Section Uninstall
 	Delete "$SMPROGRAMS\Spout 2 OBS Plugin\Uninstall Spout2 OBS Plugin.lnk"
 
 	; Clean up Spout 2 OBS Plugin
-	Delete "$INSTDIR\bin\64bit\win-spout.dll"
-	Delete "$INSTDIR\bin\64bit\Spout.dll"
-	Delete "$INSTDIR\bin\64bit\SpoutDX.dll"
-	Delete "$INSTDIR\bin\64bit\SpoutLibrary.dll"
+	Delete "$INSTDIR\win-spout.dll"
+	Delete "$INSTDIR\Spout.dll"
+	Delete "$INSTDIR\SpoutDX.dll"
+	Delete "$INSTDIR\SpoutLibrary.dll"
 	Delete "$INSTDIR\data\locale\en-US.ini"
 	Delete "$INSTDIR\data\locale\pt-BR.ini"
 	Delete "$INSTDIR\data\locale\zh-CN.ini"

@@ -82,7 +82,7 @@ function Build {
 
     Log-Group "Copying Spout DLL files"
     $SpoutPath = "$ProjectRoot/deps/Spout2/BUILD/Binaries/x64"
-    $DestPath = "$ProjOutputPath/win-spout/bin/64bit"
+    $DestPath = "$ProjOutputPath/win-spout"
     ForEach($SpoutDLL in @("Spout.dll", "SpoutLibrary.dll", "SpoutDX.dll")) {
         "-- Copying $SpoutDLL to $DestPath"
         Copy-Item -Path "$SpoutPath/$SpoutDLL" -Destination "$DestPath/$SpoutDLL"
