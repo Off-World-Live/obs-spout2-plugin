@@ -72,26 +72,73 @@ def kill_stale_test_obs() -> int:
     return killed
 
 
+def obs_version(exe: Path = paths.OBS_EXE) -> tuple[int, int, int]:
+    """File version of obs64.exe (major, minor, patch)."""
+    size = ctypes.windll.version.GetFileVersionInfoSizeW(str(exe), None)
+    if not size:
+        raise ObsLaunchError(f"cannot read the version of {exe}")
+    buf = ctypes.create_string_buffer(size)
+    ctypes.windll.version.GetFileVersionInfoW(str(exe), 0, size, buf)
+    info = ctypes.c_void_p()
+    length = wt.UINT()
+    ctypes.windll.version.VerQueryValueW(buf, "\\", ctypes.byref(info), ctypes.byref(length))
+    # VS_FIXEDFILEINFO: dwSignature, dwStrucVersion, dwFileVersionMS, dwFileVersionLS, ...
+    fixed = ctypes.cast(info, ctypes.POINTER(wt.DWORD * 4)).contents
+    ms, ls = fixed[2], fixed[3]
+    return ms >> 16, ms & 0xFFFF, ls >> 16
+
+
+def check_obs_version() -> tuple[int, int, int]:
+    version = obs_version()
+    if version[:2] < paths.MIN_OBS_VERSION:
+        need = ".".join(map(str, paths.MIN_OBS_VERSION))
+        have = ".".join(map(str, version))
+        raise ObsLaunchError(
+            f"portable OBS at {paths.PORTABLE_OBS} is {have}; the plugin needs OBS {need}+. Update the installed "
+            f"OBS and re-run  pwsh tests\\setup-user.ps1 -MakePortable"
+        )
+    return version
+
+
+def remove_legacy_portable_plugin() -> List[str]:
+    """Delete win-spout files in the pre-33 portable locations (they would load a second, stale copy)."""
+    removed = []
+    for name in (*paths.PLUGIN_RUNTIME_DLLS, "win-spout.pdb"):
+        legacy = paths.PORTABLE_LEGACY_BIN / name
+        if legacy.exists():
+            legacy.unlink()
+            removed.append(str(legacy))
+    if paths.PORTABLE_LEGACY_DATA.exists():
+        shutil.rmtree(paths.PORTABLE_LEGACY_DATA)
+        removed.append(str(paths.PORTABLE_LEGACY_DATA))
+    return removed
+
+
 def sync_plugin_into_portable() -> Dict[str, str]:
     """Mirror the installed plugin into the portable OBS.
 
-    OBS in portable mode only loads plugins from its own ``obs-plugins/64bit`` (it skips the
-    %ProgramData% plugin folder), so the DLLs that ``run.ps1 -Install`` put into
-    PLUGIN_INSTALL_DIR are copied (only when their hash differs) into the traditional layout:
-    ``<portable>/obs-plugins/64bit/*.dll`` and ``<portable>/data/obs-plugins/win-spout/locale``.
-    Returns {file: sha256} of what is now in the portable copy.
+    OBS in portable mode skips the %ProgramData% plugin folder and loads
+    ``<portable>/plugins/<name>/<name>.dll`` with ``data`` alongside, so the DLLs that
+    ``run.ps1 -Install`` put into PLUGIN_INSTALL_DIR are copied (only when their hash differs)
+    into PORTABLE_PLUGIN_DIR. Copies left in the legacy ``obs-plugins/64bit`` layout by older
+    harness runs are removed. Returns {file: sha256} of what is now in the portable copy.
     """
     import hashlib
 
-    src_bin = paths.PLUGIN_INSTALL_DIR / "bin" / "64bit"
-    src_data = paths.PLUGIN_INSTALL_DIR / "data"
-    dst_bin = paths.PORTABLE_OBS / "obs-plugins" / "64bit"
-    dst_data = paths.PORTABLE_OBS / "data" / "obs-plugins" / "win-spout"
-    if not (src_bin / "win-spout.dll").exists():
-        raise ObsLaunchError(f"plugin not installed: {src_bin / 'win-spout.dll'} missing")
+    src = paths.PLUGIN_INSTALL_DIR
+    dst = paths.PORTABLE_PLUGIN_DIR
+    if not paths.PLUGIN_DLL.exists():
+        legacy = paths.PLUGIN_LEGACY_BIN / "64bit" / "win-spout.dll"
+        hint = f" (found the pre-OBS-33 layout {legacy}; install 1.14.0+ or run run.ps1 -Build -Install)" if legacy.exists() else ""
+        raise ObsLaunchError(f"plugin not installed: {paths.PLUGIN_DLL} missing{hint}")
+    try:
+        remove_legacy_portable_plugin()
+    except PermissionError as exc:  # DLL still mapped by a running OBS
+        raise ObsLaunchError(f"cannot remove the legacy portable plugin (is an OBS using it still running?): {exc}")
+    dst.mkdir(parents=True, exist_ok=True)
     hashes: Dict[str, str] = {}
-    for dll in sorted(src_bin.glob("*.dll")):
-        dest = dst_bin / dll.name
+    for dll in sorted(src.glob("*.dll")):
+        dest = dst / dll.name
         digest = hashlib.sha256(dll.read_bytes()).hexdigest()
         if not dest.exists() or hashlib.sha256(dest.read_bytes()).hexdigest() != digest:
             try:
@@ -99,8 +146,8 @@ def sync_plugin_into_portable() -> Dict[str, str]:
             except PermissionError as exc:  # DLL still mapped by a running OBS
                 raise ObsLaunchError(f"cannot update {dest} (is an OBS using it still running?): {exc}")
         hashes[dll.name] = digest
-    if src_data.exists():
-        shutil.copytree(src_data, dst_data, dirs_exist_ok=True)
+    if (src / "data").exists():
+        shutil.copytree(src / "data", dst / "data", dirs_exist_ok=True)
     return hashes
 
 
@@ -222,6 +269,7 @@ class ObsProcess:
             )
         if port_open(paths.WS_HOST, paths.WS_PORT):
             raise ObsLaunchError(f"port {paths.WS_PORT} already in use (stale test OBS?)")
+        check_obs_version()
         self.plugin_hashes = sync_plugin_into_portable()
         seed_config(self.profile, self.variant)
         paths.OBS_SENTINEL.unlink(missing_ok=True)

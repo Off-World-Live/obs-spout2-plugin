@@ -33,8 +33,12 @@ $portableObs = if ($env:OBS_TEST_PORTABLE) { $env:OBS_TEST_PORTABLE } else { 'C:
 $stageDir = Join-Path $testsRoot '.stage'
 $backupDir = Join-Path $testsRoot '.backup'
 $releaseDir = Join-Path $repoRoot "release\$Configuration\win-spout"
-$releaseDll = Join-Path $releaseDir 'bin\64bit\win-spout.dll'
-$installedDll = Join-Path $pluginDir 'bin\64bit\win-spout.dll'
+$releaseDll = Join-Path $releaseDir 'win-spout.dll'
+$installedDll = Join-Path $pluginDir 'win-spout.dll'
+$legacyBinDir = Join-Path $pluginDir 'bin'
+$spoutBinariesDir = Join-Path $repoRoot 'deps\Spout2\BUILD\Binaries\x64'
+$spoutRuntimeDlls = @('Spout.dll', 'SpoutDX.dll', 'SpoutLibrary.dll')
+$minObsVersion = [version]'33.0'
 $installedJson = Join-Path $stageDir 'installed.json'
 
 function Step($msg) { Write-Host "`n==> $msg" -ForegroundColor Cyan }
@@ -57,6 +61,12 @@ function Get-ObsProcesses {
 }
 
 function Get-Sha256($path) { (Get-FileHash -Algorithm SHA256 -Path $path).Hash.ToLowerInvariant() }
+
+function Copy-Tree($from, $to, [switch] $Mirror) {
+    $mode = if ($Mirror) { '/MIR' } else { '/E' }
+    robocopy $from $to $mode /NFL /NDL /NJH /NJS /NP /R:1 /W:1 | Out-Null
+    return $LASTEXITCODE -lt 8
+}
 
 function Get-Commit {
     try { (& git -C $repoRoot rev-parse --short HEAD 2>$null) } catch { '' }
@@ -89,10 +99,9 @@ New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
 if ($Restore) {
     Step "Restore the backed-up plugin into $pluginDir"
     if (Get-ObsProcesses) { Fail 3 'obs64.exe is running; close OBS before restoring the plugin.' }
-    if (-not (Test-Path (Join-Path $backupDir 'bin\64bit\win-spout.dll'))) { Fail 4 "no backup at $backupDir" }
-    robocopy (Join-Path $backupDir 'bin\64bit') (Join-Path $pluginDir 'bin\64bit') *.dll /NFL /NDL /NJH /NJS /NP | Out-Null
-    if ($LASTEXITCODE -ge 8) { Fail 4 "robocopy failed ($LASTEXITCODE); run tests\setup-admin.ps1 elevated to grant write access" }
-    robocopy (Join-Path $backupDir 'data\locale') (Join-Path $pluginDir 'data\locale') /NFL /NDL /NJH /NJS /NP | Out-Null
+    if (-not (Test-Path (Join-Path $backupDir 'win-spout.dll'))) { Fail 4 "no OBS 33 layout backup at $backupDir" }
+    # The backup is a full snapshot of the plugin folder, so mirroring it back also drops anything -Install added.
+    if (-not (Copy-Tree $backupDir $pluginDir -Mirror)) { Fail 4 "robocopy failed; run tests\setup-admin.ps1 elevated to grant write access" }
     Remove-Item -Force -ErrorAction SilentlyContinue $installedJson
     Write-Host "Restored. Installed DLL sha256: $(Get-Sha256 $installedDll)"
     if (-not ($Build -or $Install -or $Test)) { exit 0 }
@@ -147,14 +156,23 @@ if ($Install) {
             $running | ForEach-Object { Write-Host "  obs64.exe pid $($_.ProcessId): $($_.ExecutablePath)" }
             Fail 3 'obs64.exe is running (it holds win-spout.dll). Close OBS and re-run -Install.'
         }
-        if (-not (Test-Path (Join-Path $backupDir 'bin\64bit\win-spout.dll')) -and (Test-Path $installedDll)) {
+        if (-not (Test-Path (Join-Path $backupDir 'win-spout.dll')) -and (Test-Path $installedDll)) {
+            if (Test-Path $backupDir) {
+                # A backup in the pre-OBS-33 bin\64bit layout cannot be restored onto OBS 33; keep it aside.
+                Move-Item $backupDir "$backupDir-legacy-$((Get-Date).ToString('yyyyMMdd-HHmmss'))"
+            }
             Write-Host "Backing up the installed plugin once to $backupDir"
-            robocopy (Join-Path $pluginDir 'bin\64bit') (Join-Path $backupDir 'bin\64bit') /NFL /NDL /NJH /NJS /NP | Out-Null
-            robocopy (Join-Path $pluginDir 'data\locale') (Join-Path $backupDir 'data\locale') /NFL /NDL /NJH /NJS /NP | Out-Null
+            if (-not (Copy-Tree $pluginDir $backupDir)) { Fail 4 "backup of $pluginDir failed" }
         }
-        robocopy (Join-Path $releaseDir 'bin\64bit') (Join-Path $pluginDir 'bin\64bit') *.dll /NFL /NDL /NJH /NJS /NP | Out-Null
+        robocopy $releaseDir $pluginDir *.dll *.pdb /NFL /NDL /NJH /NJS /NP | Out-Null
         if ($LASTEXITCODE -ge 8) { Fail 4 "robocopy into $pluginDir failed ($LASTEXITCODE); run tests\setup-admin.ps1 elevated to grant write access" }
-        robocopy (Join-Path $releaseDir 'data\locale') (Join-Path $pluginDir 'data\locale') /NFL /NDL /NJH /NJS /NP | Out-Null
+        # The cmake install tree only has win-spout.dll; the Spout runtime DLLs come from the submodule, as in Package-Windows.ps1.
+        if (Test-Path (Join-Path $spoutBinariesDir 'SpoutDX.dll')) {
+            robocopy $spoutBinariesDir $pluginDir @spoutRuntimeDlls /NFL /NDL /NJH /NJS /NP | Out-Null
+        }
+        Copy-Tree (Join-Path $releaseDir 'data') (Join-Path $pluginDir 'data') | Out-Null
+        # A pre-OBS-33 install leaves bin\64bit behind, which OBS would load as a second, Legacy copy.
+        if (Test-Path $legacyBinDir) { Remove-Item -Recurse -Force $legacyBinDir }
         $sha = Get-Sha256 $installedDll
         if ($sha -ne (Get-Sha256 $releaseDll)) { Fail 4 'installed DLL hash does not match the build output' }
         @{ sha256 = $sha; source = $releaseDll; installed_at = (Get-Date).ToString('s'); commit = (Get-Commit); plugin_dir = $pluginDir } |
@@ -170,6 +188,10 @@ if ($Test) {
     if (-not $venvPy) { Fail 4 'tests\.venv not found. Run:  pwsh -File tests\setup-user.ps1' }
     if (-not (Test-Path (Join-Path $portableObs 'bin\64bit\obs64.exe'))) {
         Fail 4 "portable test OBS not found at $portableObs. Run:  pwsh -File tests\setup-user.ps1 -MakePortable"
+    }
+    $obsVersion = [version](Get-Item (Join-Path $portableObs 'bin\64bit\obs64.exe')).VersionInfo.ProductVersion
+    if ($obsVersion -lt $minObsVersion) {
+        Fail 4 "portable test OBS is $obsVersion; the plugin needs OBS $minObsVersion+. Update OBS, then run:  pwsh -File tests\setup-user.ps1 -MakePortable"
     }
     if (-not (Test-Path $installedDll)) { Fail 4 "plugin not installed at $installedDll (run -Build -Install or install the release)" }
 

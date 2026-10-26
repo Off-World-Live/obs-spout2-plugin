@@ -22,6 +22,14 @@ pwsh -File tests\setup-admin.ps1
 pwsh -File tests\setup-user.ps1 -MakePortable
 ```
 
+The plugin is built for OBS 33+, so the portable copy must be OBS 33 or newer (`run.ps1 -Test` and
+`test_00` refuse anything older). After updating OBS, re-run `setup-user.ps1 -MakePortable`: it
+mirrors the OBS binaries and keeps the portable `config\` and `plugins\`. The harness uses the OBS 33
+plugin layout: `run.ps1 -Install` copies into `C:\ProgramData\obs-studio\plugins\win-spout\` (DLLs
+directly in the folder, `data\` alongside, any pre-33 `bin\64bit` removed), and each launch mirrors
+that into `<portable>\plugins\win-spout\`, deleting stale copies in the legacy
+`<portable>\obs-plugins\64bit` and `<portable>\data\obs-plugins\win-spout`.
+
 ## The loop
 
 ```powershell
@@ -54,7 +62,7 @@ tests\.venv\Scripts\python.exe -m pytest tests --results-dir tests\results\dev -
    means, sizes, timings), image links, and the `[win_spout]` log excerpt of the OBS instance that
    was running. Open the linked `NN-<test>-<label>.png` (small) or `.full.png` (native size).
 3. **Unexpected passes (XPASS)** means a known-issue test now passes: remove its `xfail` marker.
-4. **Expected failures** lists the known issues (#75 brightness on 10-bit canvases, #84 output
+4. **Expected failures** lists the known issues (#84 output
    levels on partial-range / PQ canvases, #73 dual-GPU hint, #80 AutoStart at launch, #66 profile
    switch while running, and one finding of this harness: the filter keeps broadcasting off-program
    once it has rendered, see `test_20_filter.py`).

@@ -7,7 +7,7 @@ is received outside OBS and sampled:
 * ``test_output_levels``      - the bars must come back as 0 / 128 / 255 (+-3) in every profile
                                 (NV12 partial vs full vs BGRA catches #84)
 * ``test_receiver_brightness`` - the receiver's grey quadrant must be 128 (+-8) through the
-                                output in every profile (catches #75 on 10-bit canvases)
+                                output in every profile (#75 on 10-bit canvases, fixed by #107)
 
 Known failures are strict xfails so a fix flips them to XPASS and the marker gets removed.
 """
@@ -82,16 +82,16 @@ OUTPUT_LEVEL_PARAMS = [
     "i010-709",
 ]
 
-# The receiver draws its sRGB texture without OBS_SOURCE_SRGB handling, so on linear (10-bit)
-# canvases the 50 % grey pattern arrives as ~186 (#75). On the PQ canvas it is the #84 path.
+# #107 decodes the sRGB sender texture, so the 10-bit canvases (#75) now come back at 128; the PQ
+# canvas still measures the receiver through the untonemapped output (#84).
 RECEIVER_PARAMS = [
     "bgra",
     "nv12-partial",
     "nv12-full",
     "i444",
-    xf("p010-709", "#75: receiver too bright on 10-bit canvases (grey 128 -> 186)"),
-    xf("p010-2100pq", "#75/#84: receiver on a PQ canvas (grey 128 -> 117 through the untonemapped output)"),
-    xf("i010-709", "#75: receiver too bright on 10-bit canvases (grey 128 -> 186)"),
+    "p010-709",
+    xf("p010-2100pq", "#84: receiver on a PQ canvas (grey 128 -> 117 through the untonemapped output)"),
+    "i010-709",
 ]
 
 

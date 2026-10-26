@@ -57,9 +57,15 @@ if ($MakePortable) {
     Step "Portable OBS copy: $ObsSource -> $PortableRoot"
     if (-not (Test-Path (Join-Path $ObsSource 'bin\64bit\obs64.exe'))) { throw "OBS not found at $ObsSource" }
     New-Item -ItemType Directory -Force -Path $PortableRoot | Out-Null
-    # /MIR would delete our seeded config on re-run, so copy additively and never remove.
-    robocopy $ObsSource $PortableRoot /E /NFL /NDL /NJH /NJS /NP /R:1 /W:1 | Out-Null
+    # Mirror so an OBS upgrade (e.g. 32 -> 33) leaves no stale binaries behind; config\ (seeded below)
+    # and plugins\ (the OBS 33 plugin folder the harness syncs win-spout into) are excluded, so kept.
+    $before = $null
+    $portableExe = Join-Path $PortableRoot 'bin\64bit\obs64.exe'
+    if (Test-Path $portableExe) { $before = (Get-Item $portableExe).VersionInfo.ProductVersion }
+    robocopy $ObsSource $PortableRoot /MIR /XD (Join-Path $PortableRoot 'config') (Join-Path $PortableRoot 'plugins') /XF portable_mode.txt /NFL /NDL /NJH /NJS /NP /R:1 /W:1 | Out-Null
     if ($LASTEXITCODE -ge 8) { throw "robocopy failed with $LASTEXITCODE" }
+    $after = (Get-Item $portableExe).VersionInfo.ProductVersion
+    Write-Host "Portable OBS version: $(if ($before -and $before -ne $after) { "$before -> " })$after"
 
     $fixtures = Join-Path $testsRoot 'fixtures\portable'
     Copy-Item -Path (Join-Path $fixtures '*') -Destination $PortableRoot -Recurse -Force

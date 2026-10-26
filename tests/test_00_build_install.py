@@ -5,18 +5,24 @@ import json
 import pytest
 
 from harness import obslog, paths
-from harness.obs_launcher import sync_plugin_into_portable
+from harness.obs_launcher import check_obs_version, sync_plugin_into_portable
 
 
 def _sha256(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def test_portable_obs_version(artifacts):
+    version = check_obs_version()
+    artifacts.value("portable_obs_version", ".".join(map(str, version)))
+
+
 def test_installed_plugin_present():
-    bin_dir = paths.PLUGIN_INSTALL_DIR / "bin" / "64bit"
-    missing = [n for n in ("win-spout.dll", "Spout.dll", "SpoutDX.dll", "SpoutLibrary.dll") if not (bin_dir / n).exists()]
-    assert not missing, f"missing in {bin_dir}: {missing}"
-    assert (paths.PLUGIN_INSTALL_DIR / "data" / "locale" / "en-US.ini").exists()
+    plugin_dir = paths.PLUGIN_INSTALL_DIR
+    missing = [n for n in paths.PLUGIN_RUNTIME_DLLS if not (plugin_dir / n).exists()]
+    assert not missing, f"missing in {plugin_dir}: {missing}"
+    assert (plugin_dir / "data" / "locale" / "en-US.ini").exists()
+    assert not paths.PLUGIN_LEGACY_BIN.exists(), f"{paths.PLUGIN_LEGACY_BIN} left by a pre-OBS-33 install (OBS loads it as Legacy)"
 
 
 def test_installed_matches_build(artifacts):
@@ -34,10 +40,12 @@ def test_installed_matches_build(artifacts):
 
 def test_portable_mirror_matches_installed(artifacts):
     hashes = sync_plugin_into_portable()
-    mirrored = paths.PORTABLE_OBS / "obs-plugins" / "64bit" / "win-spout.dll"
+    mirrored = paths.PORTABLE_PLUGIN_DIR / "win-spout.dll"
     artifacts.value("mirrored_sha256", _sha256(mirrored))
     assert _sha256(mirrored) == hashes["win-spout.dll"]
-    assert (paths.PORTABLE_OBS / "data" / "obs-plugins" / "win-spout" / "locale" / "en-US.ini").exists()
+    assert (paths.PORTABLE_PLUGIN_DIR / "data" / "locale" / "en-US.ini").exists()
+    assert not (paths.PORTABLE_LEGACY_BIN / "win-spout.dll").exists()
+    assert not paths.PORTABLE_LEGACY_DATA.exists()
 
 
 def test_obs_launches_and_plugin_loads(obs_manager, artifacts):

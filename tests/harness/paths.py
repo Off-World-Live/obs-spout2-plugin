@@ -29,14 +29,26 @@ OBS_LOG_DIR = OBS_CONFIG_DIR / "logs"
 OBS_CRASH_DIR = OBS_CONFIG_DIR / "crashes"
 OBS_SENTINEL = OBS_CONFIG_DIR / ".sentinel"
 
-# Installed plugin (NSIS layout, loaded by both the user's OBS and the portable copy).
+# OBS 33 is the oldest OBS the plugin is built for (buildspec.json); older OBS refuses to load it.
+MIN_OBS_VERSION = (33, 0)
+
+# Installed plugin, OBS 33 layout: plugins/<name>/<name>.dll with data/ alongside (NSIS layout,
+# loaded by the user's OBS; mirrored into the portable copy by sync_plugin_into_portable).
 PLUGIN_INSTALL_DIR = Path(
     os.environ.get("OBS_SPOUT_PLUGIN_DIR", r"C:\ProgramData\obs-studio\plugins\win-spout")
 )
-PLUGIN_DLL = PLUGIN_INSTALL_DIR / "bin" / "64bit" / "win-spout.dll"
+PLUGIN_DLL = PLUGIN_INSTALL_DIR / "win-spout.dll"
+PLUGIN_RUNTIME_DLLS = ("win-spout.dll", "Spout.dll", "SpoutDX.dll", "SpoutLibrary.dll")
 BUILD_CONFIGURATION = os.environ.get("OBS_SPOUT_BUILD_CONFIG", "RelWithDebInfo")
 BUILD_OUTPUT_DIR = REPO_ROOT / "release" / BUILD_CONFIGURATION / "win-spout"
-BUILD_OUTPUT_DLL = BUILD_OUTPUT_DIR / "bin" / "64bit" / "win-spout.dll"
+BUILD_OUTPUT_DLL = BUILD_OUTPUT_DIR / "win-spout.dll"
+
+# Where portable OBS 33 loads the plugin from (<OBS root>/plugins/<name>), and the pre-33
+# locations that would load a second, stale copy (OBS flags those as Legacy).
+PORTABLE_PLUGIN_DIR = PORTABLE_OBS / "plugins" / "win-spout"
+PLUGIN_LEGACY_BIN = PLUGIN_INSTALL_DIR / "bin"
+PORTABLE_LEGACY_BIN = PORTABLE_OBS / "obs-plugins" / "64bit"
+PORTABLE_LEGACY_DATA = PORTABLE_OBS / "data" / "obs-plugins" / "win-spout"
 
 STAGE_DIR = TESTS_DIR / ".stage"
 INSTALLED_JSON = STAGE_DIR / "installed.json"
