@@ -263,7 +263,10 @@ static void win_spout_source_destroy(void *data)
 static void win_spout_source_defaults(obs_data_t *settings)
 {
 	obs_data_set_default_string(settings, SPOUT_SENDER_LIST, USE_FIRST_AVAILABLE_SENDER);
-	obs_data_set_default_int(settings, "tickspeedlimit", 100);
+	obs_data_set_default_int(settings, SPOUT_TICK_SPEED_LIMIT, 100);
+	// Without a default the combo box showed nothing selected while rendering opaque
+	// (the switch's fallback); make that explicit so the UI matches the behaviour.
+	obs_data_set_default_int(settings, SPOUT_COMPOSITE_MODE, COMPOSITE_MODE_OPAQUE);
 }
 
 static void win_spout_source_show(void *data)
@@ -476,7 +479,7 @@ static obs_properties_t *win_spout_properties(void *data)
 
 	obs_properties_t *props = obs_properties_create();
 
-	obs_property_t *sender_list = obs_properties_add_list(props, SPOUT_SENDER_LIST, obs_module_text("SpoutSenders"),
+	obs_property_t *sender_list = obs_properties_add_list(props, SPOUT_SENDER_LIST, obs_module_text("spoutsenders"),
 							      OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
 
 	fill_senders(context->spout_receiver_ptr, sender_list);
