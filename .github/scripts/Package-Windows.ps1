@@ -64,12 +64,12 @@ function Package {
 
     # The cmake install tree only contains win-spout.dll. The Spout runtime DLLs it
     # depends on are placed elsewhere by a POST_BUILD step, so stage them into the
-    # plugin bin directory here to make both the standard and portable archives
-    # self-contained (mirrors the DLLs bundled by the NSIS installer).
+    # plugin directory next to win-spout.dll here to make both the standard and portable
+    # archives self-contained (mirrors the DLLs bundled by the NSIS installer).
     $SpoutBinariesDir = "${ProjectRoot}/deps/Spout2/BUILD/Binaries/x64"
     $SpoutRuntimeDlls = @('Spout.dll', 'SpoutDX.dll', 'SpoutLibrary.dll')
     foreach ( $Dll in $SpoutRuntimeDlls ) {
-        Copy-Item -Path "${SpoutBinariesDir}/${Dll}" -Destination "${InstallRoot}/bin/64bit/${Dll}" -Force
+        Copy-Item -Path "${SpoutBinariesDir}/${Dll}" -Destination "${InstallRoot}/${Dll}" -Force
     }
 
     Log-Group "Archiving ${ProductName}..."
@@ -81,20 +81,15 @@ function Package {
     }
     Compress-Archive -Force @CompressArgs
 
-    # Traditional portable layout: re-arrange <plugin>/bin/64bit and <plugin>/data into
-    # obs-plugins/64bit and data/obs-plugins/<plugin> so the archive can be extracted
-    # straight onto an OBS install.
+    # Portable layout (OBS 33+): nest the plugin directory under plugins/ so the archive
+    # can be extracted straight onto the root of a portable OBS install, giving
+    # plugins/<plugin>/<plugin>.dll and plugins/<plugin>/data.
     Log-Group "Archiving ${ProductName} portable layout..."
-    $PortableBinPath = "${PortableRoot}/obs-plugins/64bit"
-    $PortableDataPath = "${PortableRoot}/data/obs-plugins/${ProductName}"
+    $PortablePluginsPath = "${PortableRoot}/plugins"
 
-    New-Item -Path $PortableBinPath -ItemType Directory -Force | Out-Null
-    New-Item -Path $PortableDataPath -ItemType Directory -Force | Out-Null
+    New-Item -Path $PortablePluginsPath -ItemType Directory -Force | Out-Null
 
-    Copy-Item -Path "${InstallRoot}/bin/64bit/*" -Destination $PortableBinPath -Recurse -Force
-    if ( Test-Path "${InstallRoot}/data" ) {
-        Copy-Item -Path "${InstallRoot}/data/*" -Destination $PortableDataPath -Recurse -Force
-    }
+    Copy-Item -Path $InstallRoot -Destination $PortablePluginsPath -Recurse -Force
 
     $PortableCompressArgs = @{
         Path = (Get-ChildItem -Path $PortableRoot)

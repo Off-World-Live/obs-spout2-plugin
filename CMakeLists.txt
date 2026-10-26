@@ -68,7 +68,7 @@ target_link_libraries(
 		OBS::w32-pthreads
 	)
 
-set(INSTALLED_PLUGIN_BIN_DIR "${CMAKE_INSTALL_PREFIX}/${CMAKE_PROJECT_NAME}/${CMAKE_INSTALL_BINDIR}/64bit")
+set(INSTALLED_PLUGIN_BIN_DIR "${CMAKE_INSTALL_PREFIX}/${CMAKE_PROJECT_NAME}")
 
 function(copy_spout_file)
 	add_custom_command(TARGET ${CMAKE_PROJECT_NAME} POST_BUILD

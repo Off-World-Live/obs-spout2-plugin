@@ -32,7 +32,20 @@ Thanks to the authors of [SPOUT](https://github.com/leadedge/Spout2) for the lib
 - Go to the [Releases Page](https://github.com/Off-World-Live/obs-spout2-plugin/releases)
 - Download the windows installer: `OBS_Spout2_Plugin_Installer.exe`
 - Run the installer (accepting installation from untrusted source)
-- Select the `OBS` directory if not the default install location
+- Keep the default install location (`C:\ProgramData\obs-studio\plugins\win-spout`) unless you use a portable OBS
+  install, in which case choose `<OBS folder>\plugins\win-spout`
+
+This version requires OBS Studio 33.0 or newer. It uses the plugin layout introduced in OBS 33, so it is not flagged as
+**Legacy** in the plugin manager:
+
+```
+plugins\win-spout\win-spout.dll   (plus Spout.dll, SpoutDX.dll, SpoutLibrary.dll)
+plugins\win-spout\data\locale\*.ini
+```
+
+The installer removes files left by older versions in `plugins\win-spout\bin\64bit` and
+`C:\Program Files\obs-studio\obs-plugins\64bit`. If you installed manually from a zip, delete those old copies yourself.
+For a portable OBS install, extract the `-portable` zip into the root of the OBS folder.
 
 > N.B there are no current plans for 32bit builds, although theoretically this should be possible
 
