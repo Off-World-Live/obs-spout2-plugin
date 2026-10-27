@@ -86,16 +86,33 @@ static void spout_obs_event(enum obs_frontend_event event, void *)
 
 bool obs_module_load(void)
 {
-	// load spout - source
-	spout_source_info = create_spout_source_info();
-	if (obs_source_get_display_name(spout_source_info.id)) {
-		// libobs keeps the first registration, so ours would silently not appear (#56).
-		blog(LOG_ERROR,
-		     "another plugin already registered the source id '%s' (PRPR Live's prpr-library.dll is a known case); "
-		     "'Spout2 Capture' will be missing from the Sources list until that plugin is removed",
-		     spout_source_info.id);
+	// First line of every support log: both versions at a glance.
+	blog(LOG_INFO, "win-spout %s (built against libobs %d.%d.%d) loading on OBS %s", PLUGIN_VERSION,
+	     LIBOBS_API_MAJOR_VER, LIBOBS_API_MINOR_VER, LIBOBS_API_PATCH_VER, obs_get_version_string());
+
+	// The source and filter share textures with OBS's D3D11 device, so they need the Direct3D 11
+	// renderer. The output sends CPU frames from its own D3D11 device and works on any renderer (#64).
+	obs_enter_graphics();
+	const bool d3d11 = gs_get_device_type() == GS_DEVICE_DIRECT3D_11;
+	obs_leave_graphics();
+	if (!d3d11) {
+		blog(LOG_WARNING, "OBS is running with the OpenGL renderer (--allow-opengl): the Spout2 Capture "
+				  "source and the Spout Filter need Direct3D 11 and are not available. The Spout "
+				  "Output (Tools menu) still works");
 	}
-	obs_register_source(&spout_source_info);
+
+	// load spout - source
+	if (d3d11) {
+		spout_source_info = create_spout_source_info();
+		if (obs_source_get_display_name(spout_source_info.id)) {
+			// libobs keeps the first registration, so ours would silently not appear (#56).
+			blog(LOG_ERROR,
+			     "another plugin already registered the source id '%s' (PRPR Live's prpr-library.dll is a known case); "
+			     "'Spout2 Capture' will be missing from the Sources list until that plugin is removed",
+			     spout_source_info.id);
+		}
+		obs_register_source(&spout_source_info);
+	}
 
 	// load spout output
 	win_spout_config *config = win_spout_config::get();
@@ -133,8 +150,10 @@ bool obs_module_load(void)
 	obs_frontend_add_event_callback(spout_obs_event, nullptr);
 
 	// load spout filter
-	spout_filter_info = create_spout_filter_info();
-	obs_register_source(&spout_filter_info);
+	if (d3d11) {
+		spout_filter_info = create_spout_filter_info();
+		obs_register_source(&spout_filter_info);
+	}
 
 	blog(LOG_INFO, "win-spout loaded!");
 

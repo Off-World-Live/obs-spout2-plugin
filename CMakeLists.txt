@@ -16,6 +16,9 @@ include(helpers)
 
 add_library(${CMAKE_PROJECT_NAME} MODULE)
 
+# Version string from buildspec.json, logged at module load alongside the OBS version.
+target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE PLUGIN_VERSION="${PLUGIN_VERSION}")
+
 find_package(libobs REQUIRED)
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE OBS::libobs)
 
