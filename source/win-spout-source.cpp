@@ -252,9 +252,13 @@ static void win_spout_source_receive(spout_source *context)
 
 	if (!connected) {
 		const bool had_texture = context->texture != NULL;
+		// ReceiveTexture() fails with the share handle still set only when the sender exists but
+		// OpenSharedResource failed on our device; read it before the disconnect resets it.
+		// (GetSenderTexture() is no test: it is NULL until a frame has been copied.)
+		const bool handle_unopened = receiver->GetSenderHandle() != nullptr;
 		win_spout_source_disconnect(context);
 
-		if (receiver->GetSenderHandle() && !receiver->GetSenderTexture()) {
+		if (handle_unopened) {
 			// spoutDX found the sender but could not open its share handle on our device.
 			if (context->spout_status != -8) {
 				warn("Could not open the shared texture of sender %s. This usually means the sender is "
@@ -277,21 +281,9 @@ static void win_spout_source_receive(spout_source *context)
 	}
 
 	// New sender, or the sender's size/format changed: rebuild our texture, the next
-	// ReceiveTexture() call copies into it.
+	// ReceiveTexture() call copies into it. spoutDX only reports an update once the sender's
+	// shared texture has been opened on our device.
 	if (receiver->IsUpdated()) {
-		if (!receiver->GetSenderTexture()) {
-			// spoutDX reports the sender but has no texture for it: the share handle could
-			// not be opened on our device (sender on another GPU). Don't build a texture we
-			// can never fill; wait for the sender to change.
-			if (context->spout_status != -8) {
-				warn("Could not open the shared texture of sender %s. This usually means the sender is "
-				     "running on a different GPU than OBS: in Windows Settings > System > Display > "
-				     "Graphics set both OBS and the sender to the same GPU, then restart the sender.",
-				     receiver->GetSenderName());
-				context->spout_status = -8;
-			}
-			return;
-		}
 		win_spout_source_create_texture(context);
 	}
 }
