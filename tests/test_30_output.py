@@ -1,8 +1,6 @@
 """Tools > Spout Output (`OBS Spout Output` obs_output) assertions (plan 4.6)."""
 import time
 
-import pytest
-
 from harness import obslog, paths, pattern, spout_tool
 
 OUT = paths.OUTPUT_SENDER
@@ -96,7 +94,6 @@ def test_output_start_stop_cycles(scene, artifacts, obs_manager):
     assert after[1] == before[1], "errors were logged during start/stop cycles"
 
 
-@pytest.mark.xfail(strict=True, reason="#80/#92: since 1.12.0 AutoStart only fires when the Tools dialog is opened, not at OBS start")
 def test_autostart_variant_starts_output_at_launch(obs_manager, artifacts):
     client = obs_manager.get(paths.DEFAULT_PROFILE, "autostart")
     t0 = time.monotonic()
@@ -107,7 +104,6 @@ def test_autostart_variant_starts_output_at_launch(obs_manager, artifacts):
     assert client.output_active()
 
 
-@pytest.mark.xfail(strict=True, reason="#66: OBS refuses obs_reset_video while the raw output is active, so the sender keeps the old size")
 def test_profile_switch_while_running_follows_size(scene, obs_manager, artifacts):
     scene.create_color_source("GREY", (128, 128, 128), width=1280, height=720)
     _start(scene)

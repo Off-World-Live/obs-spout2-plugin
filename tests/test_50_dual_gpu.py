@@ -85,7 +85,6 @@ def test_cross_gpu_sender_listed_and_no_crash(cross_gpu, artifacts):
     assert cross_gpu["black"], f"expected a black source for a cross-GPU sender, got {cross_gpu['means']}"
 
 
-@pytest.mark.xfail(strict=True, reason="#73: receiver logs nothing actionable when gs_texture_open_shared fails for a sender on another GPU")
 def test_cross_gpu_actionable_hint_logged(cross_gpu, artifacts):
     _record(artifacts, cross_gpu)
     hint = [l for l in cross_gpu["log_lines"] if "[win_spout]" in l and ("same GPU" in l or "different GPU" in l)]
