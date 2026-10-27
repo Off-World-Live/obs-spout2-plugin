@@ -300,7 +300,8 @@ bool open_dx(spoutDX &dx, const Args &a, std::string &adapter_name)
 		}
 		dx.SetAdapterAuto(false);
 		if (!dx.SetAdapter(idx)) {
-			emit("{\"event\":\"error\",\"message\":\"SetAdapter failed for index " + std::to_string(idx) + "\"}");
+			emit("{\"event\":\"error\",\"message\":\"SetAdapter failed for index " + std::to_string(idx) +
+			     "\"}");
 			return false;
 		}
 	}
@@ -358,7 +359,8 @@ int cmd_send(const Args &a)
 			break;
 		paint_strip(px, a.w, a.h, frame, order);
 		if (!dx.SendImage(px.data(), (unsigned)a.w, (unsigned)a.h)) {
-			emit("{\"event\":\"error\",\"message\":\"SendImage failed\",\"frame\":" + std::to_string(frame) + "}");
+			emit("{\"event\":\"error\",\"message\":\"SendImage failed\",\"frame\":" +
+			     std::to_string(frame) + "}");
 			dx.ReleaseSender();
 			dx.CloseDirectX11();
 			return 2;
@@ -370,8 +372,8 @@ int cmd_send(const Args &a)
 			emit("{\"event\":\"started\",\"backend\":\"spout-tool\",\"name\":\"" + json_escape(a.name) +
 			     "\",\"width\":" + std::to_string(a.w) + ",\"height\":" + std::to_string(a.h) +
 			     ",\"fps\":" + std::to_string(a.fps) + ",\"seed\":" + std::to_string(a.seed) +
-			     ",\"alpha\":\"" + a.alpha + "\",\"format\":\"" + a.format + "\",\"adapter\":" + adapter_json(dx) +
-			     ",\"pid\":" + std::to_string(GetCurrentProcessId()) + "}");
+			     ",\"alpha\":\"" + a.alpha + "\",\"format\":\"" + a.format + "\",\"adapter\":" +
+			     adapter_json(dx) + ",\"pid\":" + std::to_string(GetCurrentProcessId()) + "}");
 		}
 		if (a.fps > 0)
 			dx.HoldFps((int)a.fps);
@@ -467,7 +469,8 @@ int cmd_recv(const Args &a)
 			const std::string order = (fmt == DXGI_FORMAT_R8G8B8A8_UNORM) ? "rgba" : "bgra";
 			FILE *j = std::fopen((a.out + ".json").c_str(), "wb");
 			if (j) {
-				std::fprintf(j, "{\"width\":%u,\"height\":%u,\"order\":\"%s\",\"format\":%d}", w, h, order.c_str(), (int)fmt);
+				std::fprintf(j, "{\"width\":%u,\"height\":%u,\"order\":\"%s\",\"format\":%d}", w, h,
+					     order.c_str(), (int)fmt);
 				std::fclose(j);
 			}
 			out_json = "\"" + json_escape(a.out) + "\"";
@@ -476,14 +479,18 @@ int cmd_recv(const Args &a)
 	dx.ReleaseReceiver();
 	dx.CloseDirectX11();
 
-	auto pat = [](int v) { return v < 0 ? std::string("null") : std::to_string(v); };
-	emit("{\"backend\":\"spout-tool\",\"name\":\"" + json_escape(a.name) + "\",\"sender\":" +
-	     (connected ? "\"" + json_escape(a.name) + "\"" : "null") + ",\"connected\":" + (connected ? "true" : "false") +
-	     ",\"width\":" + std::to_string(w) + ",\"height\":" + std::to_string(h) + ",\"format\":" + std::to_string((int)fmt) +
-	     ",\"frame_first\":" + std::to_string(frame_first < 0 ? 0 : frame_first) + ",\"frame_last\":" + std::to_string(frame_last) +
-	     ",\"fps\":" + std::to_string(fps) + ",\"new_frames\":" + std::to_string(reads) + ",\"distinct_frames\":" +
-	     std::to_string(distinct) + ",\"pattern_first\":" + pat(pattern_first) + ",\"pattern_last\":" + pat(pattern_last) +
-	     ",\"elapsed\":" + std::to_string(elapsed) + ",\"out\":" + out_json + ",\"adapter\":" + adapter_json(dx) + "}");
+	auto pat = [](int v) {
+		return v < 0 ? std::string("null") : std::to_string(v);
+	};
+	emit("{\"backend\":\"spout-tool\",\"name\":\"" + json_escape(a.name) +
+	     "\",\"sender\":" + (connected ? "\"" + json_escape(a.name) + "\"" : "null") +
+	     ",\"connected\":" + (connected ? "true" : "false") + ",\"width\":" + std::to_string(w) +
+	     ",\"height\":" + std::to_string(h) + ",\"format\":" + std::to_string((int)fmt) + ",\"frame_first\":" +
+	     std::to_string(frame_first < 0 ? 0 : frame_first) + ",\"frame_last\":" + std::to_string(frame_last) +
+	     ",\"fps\":" + std::to_string(fps) + ",\"new_frames\":" + std::to_string(reads) +
+	     ",\"distinct_frames\":" + std::to_string(distinct) + ",\"pattern_first\":" + pat(pattern_first) +
+	     ",\"pattern_last\":" + pat(pattern_last) + ",\"elapsed\":" + std::to_string(elapsed) +
+	     ",\"out\":" + out_json + ",\"adapter\":" + adapter_json(dx) + "}");
 	return connected ? 0 : 1;
 }
 
@@ -508,9 +515,10 @@ int cmd_list(const Args &)
 		const int ad = dx.GetSenderAdapter(name, adapter, sizeof(adapter));
 		if (i)
 			json += ",";
-		json += "{\"name\":\"" + json_escape(name) + "\",\"width\":" + std::to_string(w) + ",\"height\":" +
-			std::to_string(h) + ",\"format\":" + std::to_string(fmt) + ",\"adapter\":{\"index\":" + std::to_string(ad) +
-			",\"name\":\"" + json_escape(adapter) + "\"}}";
+		json += "{\"name\":\"" + json_escape(name) + "\",\"width\":" + std::to_string(w) +
+			",\"height\":" + std::to_string(h) + ",\"format\":" + std::to_string(fmt) +
+			",\"adapter\":{\"index\":" + std::to_string(ad) + ",\"name\":\"" + json_escape(adapter) +
+			"\"}}";
 	}
 	json += "]}";
 	emit(json);
