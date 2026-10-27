@@ -16,6 +16,7 @@
 #define PARAM_AUTO_START "auto_start"
 #define PARAM_SPOUT_OUTPUT_NAME "spout_output_name"
 #define PARAM_CONTINUOUS_BROADCAST "continuous_broadcast"
+#define PARAM_OUTPUT_HOTKEYS "output_hotkeys"
 
 win_spout_config *win_spout_config::_instance = nullptr;
 
@@ -38,6 +39,8 @@ void win_spout_config::load()
 		auto_start = config_get_bool(obs_config, SECTION_NAME, PARAM_AUTO_START);
 		spout_output_name = config_get_string(obs_config, SECTION_NAME, PARAM_SPOUT_OUTPUT_NAME);
 		continuous_broadcast = config_get_bool(obs_config, SECTION_NAME, PARAM_CONTINUOUS_BROADCAST);
+		const char *hotkeys = config_get_string(obs_config, SECTION_NAME, PARAM_OUTPUT_HOTKEYS);
+		output_hotkeys = hotkeys ? hotkeys : "";
 	}
 }
 
@@ -49,6 +52,7 @@ void win_spout_config::save()
 		config_set_string(obs_config, SECTION_NAME, PARAM_SPOUT_OUTPUT_NAME,
 				  spout_output_name.toUtf8().constData());
 		config_set_bool(obs_config, SECTION_NAME, PARAM_CONTINUOUS_BROADCAST, continuous_broadcast);
+		config_set_string(obs_config, SECTION_NAME, PARAM_OUTPUT_HOTKEYS, output_hotkeys.toUtf8().constData());
 		config_save(obs_config);
 	}
 }

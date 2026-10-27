@@ -30,6 +30,9 @@ public:
 	// source is being rendered). Default off. Atomic because the render thread reads
 	// it every frame while the settings dialog writes it from the UI thread.
 	std::atomic<bool> continuous_broadcast;
+	// Key bindings of the output's Start/Stop hotkeys (#54), as obs_hotkey_pair_save() JSON.
+	// Frontend hotkeys are not saved by OBS, so they live here with the other output settings.
+	QString output_hotkeys;
 
 private:
 	static win_spout_config *_instance;
