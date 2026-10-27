@@ -63,9 +63,8 @@ tests\.venv\Scripts\python.exe -m pytest tests --results-dir tests\results\dev -
    was running. Open the linked `NN-<test>-<label>.png` (small) or `.full.png` (native size).
 3. **Unexpected passes (XPASS)** means a known-issue test now passes: remove its `xfail` marker.
 4. **Expected failures** lists the known issues (#84 output
-   levels on partial-range / PQ canvases, #73 dual-GPU hint, #80 AutoStart at launch, #66 profile
-   switch while running, and one finding of this harness: the filter keeps broadcasting off-program
-   once it has rendered, see `test_20_filter.py`).
+   levels on partial-range / PQ canvases, and one finding of this harness: the filter keeps
+   broadcasting off-program once it has rendered, see `test_20_filter.py`).
 5. The **OBS logs** table at the end links every `obs-<profile>-<variant>-NN.log` with warning /
    error counts and forbidden-line hits; `desktop-*.png` is a desktop grab per launch (catches a
    blocking dialog).
