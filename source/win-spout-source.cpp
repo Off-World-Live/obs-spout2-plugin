@@ -488,8 +488,11 @@ static void win_spout_source_tick(void *data, float seconds)
 
 	// Receive regardless of visibility (earlier versions re-initialised on the next tick
 	// after hide() anyway), so switching to a scene with this source never shows a black
-	// frame while it reconnects.
+	// frame while it reconnects. video_tick runs on the graphics thread but outside the
+	// graphics context, where gs_get_device_obj() returns NULL, so enter it here.
+	obs_enter_graphics();
 	win_spout_source_receive(context);
+	obs_leave_graphics();
 }
 
 static void fill_senders(spoutDX *receiver, obs_property_t *list)
