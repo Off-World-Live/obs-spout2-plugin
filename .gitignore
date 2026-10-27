@@ -45,6 +45,7 @@ build
 !/cmake
 !/data
 !/source
+!/tests
 !.clang-format
 !.gersemirc
 !.gitignore
@@ -62,3 +63,12 @@ build
 
 # Exclude CMake build number cache
 /cmake/.CMakeBuildNumber
+
+# Test harness local state (see tests/README.md)
+/tests/results/
+/tests/.venv/
+/tests/.stage/
+/tests/.backup/
+/tests/spout-tool/build/
+/tests/**/__pycache__/
+/tests/.pytest_cache/
