@@ -105,7 +105,8 @@ def test_sender_exit_no_crash(scene, senders, obs_manager, artifacts):
     assert obs_manager.current.alive(), "OBS died after the sender exited"
     assert scene.stats()["activeFps"] > 0
     text = obs_manager.log_text()
-    assert "has changed / gone away" in text
+    # 1.14 logs "... has changed / gone away", the spoutDX receiver (#86) "Sender ... has gone away"
+    assert "gone away" in text
     img = scene.screenshot("RX")
     artifacts.image("rx-after-sender-exit", img)
     artifacts.value("means", _means(img))
