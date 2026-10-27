@@ -29,7 +29,7 @@ Thanks to the authors of [SPOUT](https://github.com/leadedge/Spout2) for the lib
 
 ## Requirements
 
-- Windows 10/11, 64-bit, OBS Studio running on its default **Direct3D 11** renderer (the OpenGL renderer, `--allow-opengl`, is not supported — Spout shares D3D11 textures).
+- Windows 10/11, 64-bit, OBS Studio running on its default **Direct3D 11** renderer. On the OpenGL renderer (`--allow-opengl`) only the Spout Output from the Tools menu works; the Spout2 Capture source and the Spout Filter share textures with OBS's Direct3D 11 device and are not available.
 - **A matching OBS Studio version.** Each release is built against a specific OBS version and OBS refuses to load plugins
   that were built for a newer OBS than the one running. The release page states the minimum OBS version for each download
   (for example *"requires OBS Studio 33.0 or newer"*). If you are on an older OBS, update OBS or pick an older plugin release.
