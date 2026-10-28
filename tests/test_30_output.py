@@ -124,3 +124,19 @@ def test_profile_switch_while_running_follows_size(scene, obs_manager, artifacts
     finally:
         # the output was active during the switch; give the next test a fresh OBS
         obs_manager.stop()
+
+
+def test_websocket_start_after_profile_switch_uses_new_size(scene, obs_manager, artifacts):
+    # obs-websocket's StartOutput calls obs_output_start() directly, so the output must pick up
+    # the video of the current profile itself rather than the one it was created with.
+    scene.create_color_source("GREY", (128, 128, 128), width=1280, height=720)
+    try:
+        scene.set_profile("portrait")
+        assert scene.wait(lambda: scene.video_settings()["outputWidth"] == 720, timeout=6.0), "profile switch did not apply"
+        _start(scene)
+        r = spout_tool.receive(OUT, frames=2, timeout=3.0)
+        artifacts.value("sender_size", (r["width"], r["height"]))
+        assert obs_manager.current.alive()
+        assert (r["width"], r["height"]) == (720, 1280)
+    finally:
+        obs_manager.stop()

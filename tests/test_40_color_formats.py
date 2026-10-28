@@ -5,7 +5,7 @@ Spout2 Capture of the test pattern (red/green/blue/grey quadrants) bottom-left. 
 is received outside OBS and sampled:
 
 * ``test_output_levels``      - the bars must come back as 0 / 128 / 255 (+-3) in every profile
-                                (NV12 partial vs full vs BGRA catches #84)
+                                (NV12 partial vs full vs BGRA vs PQ, #84)
 * ``test_receiver_brightness`` - the receiver's grey quadrant must be 128 (+-8) through the
                                 output in every profile (#75 on 10-bit canvases, fixed by #107)
 
@@ -69,28 +69,28 @@ def _attach(artifacts, m, profile):
     artifacts.image(f"program-{profile}", m["program"])
 
 
-# Measured with 1.12.0 on OBS 32.2.2 (see tests/README.md): the raw_video output path receives
-# frames *after* OBS's output colour conversion, so partial-range 8-bit canvases come back
-# 124/126 instead of 128 and a PQ canvas is not tone-mapped at all (grey 117, white 157).
+# The output sends the canvas texture from before OBS's output colour conversion (#84), so the
+# levels no longer depend on the colour format or range. Up to 1.14.0 it received raw frames after
+# the conversion: partial-range 8-bit canvases came back 124/126 instead of 128 and a PQ canvas was
+# sent PQ-encoded (grey 117, white 157).
 OUTPUT_LEVEL_PARAMS = [
     "bgra",
-    xf("nv12-partial", "#84: Tools output content depends on the canvas colour format (partial range off by ~4)"),
+    "nv12-partial",
     "nv12-full",
-    xf("i444", "#84: Tools output content depends on the canvas colour format (partial range off by ~4)"),
+    "i444",
     "p010-709",
-    xf("p010-2100pq", "#84: Tools output sends the PQ-encoded canvas untouched (grey 117, white 157)"),
+    "p010-2100pq",
     "i010-709",
 ]
 
-# #107 decodes the sRGB sender texture, so the 10-bit canvases (#75) now come back at 128; the PQ
-# canvas still measures the receiver through the untonemapped output (#84).
+# #107 decodes the sRGB sender texture, so the 10-bit canvases (#75) come back at 128.
 RECEIVER_PARAMS = [
     "bgra",
     "nv12-partial",
     "nv12-full",
     "i444",
     "p010-709",
-    xf("p010-2100pq", "#84: receiver on a PQ canvas (grey 128 -> 117 through the untonemapped output)"),
+    "p010-2100pq",
     "i010-709",
 ]
 

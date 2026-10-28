@@ -26,7 +26,7 @@ OBS_MODULE_USE_DEFAULT_LOCALE("win-spout", "en-US")
 extern struct obs_source_info create_spout_source_info();
 struct obs_source_info spout_source_info;
 
-extern struct obs_output_info create_spout_output_info();
+extern struct obs_output_info create_spout_output_info(bool gpu);
 struct obs_output_info spout_output_info;
 
 extern struct obs_source_info create_spout_filter_info();
@@ -210,7 +210,7 @@ bool obs_module_load(void)
 	win_spout_config *config = win_spout_config::get();
 	config->load();
 
-	spout_output_info = create_spout_output_info();
+	spout_output_info = create_spout_output_info(d3d11);
 	obs_register_output(&spout_output_info);
 
 	obs_data_t *settings = obs_data_create();
@@ -296,11 +296,6 @@ bool spout_output_start(const char *SpoutName)
 	obs_data_set_string(settings, "senderName", SpoutName);
 	obs_output_update(win_spout_out, settings);
 	obs_data_release(settings);
-
-	// obs_output_create() captured the video/audio handles that existed at module load.
-	// Every obs_reset_video() (profile switch, Settings > Video) replaces them, so point the
-	// output at the current ones before starting or we hand libobs a dangling video_t.
-	obs_output_set_media(win_spout_out, obs_get_video(), obs_get_audio());
 
 	if (!obs_output_start(win_spout_out)) {
 		blog(LOG_ERROR, "Failed to start Spout output '%s'", SpoutName);

@@ -10,7 +10,6 @@ PLUGIN_TAG = "[win_spout]"
 
 REQUIRED = [
     "win-spout loaded!",
-    "Opened DX11",
 ]
 REQUIRED_ON_CLEAN_EXIT = [
     "win-spout unloaded!",
