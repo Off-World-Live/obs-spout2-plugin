@@ -77,13 +77,14 @@ tests/
   harness/      paths, obs_launcher (launch/readiness/stop), obs_client (websocket), spout_tool
                 (backend selection), spoutgl_tool (fallback CLI), pattern (test image codec),
                 obslog, gpu_prefs (HKCU UserGpuPreferences), report
-  fixtures/portable/      portable_mode.txt + seeded config (websocket 4466, profiles, scene collection)
+  fixtures/portable/      portable_mode.txt + seeded config (websocket 4466, profiles, scene collections
+                          spout-test and spout-filter-saved)
   fixtures/user-ini-variants/   continuous.ini, autostart.ini  ([win_spout] overrides)
   golden/       composite-modes.json, log-baseline.json (created on first run, then compared)
   spout-tool/   C++ SpoutDX sender/receiver/list (built by run.ps1 -Build; same JSON contract as spoutgl_tool)
   unit/         pure-Python tests (pattern codec, log parser, report) - run on hosted CI
-  test_00_build_install.py  test_10_receiver.py  test_20_filter.py  test_30_output.py
-  test_40_color_formats.py  test_50_dual_gpu.py  test_60_logs.py
+  test_00_build_install.py  test_10_receiver.py  test_20_filter.py  test_25_filter_saved.py
+  test_30_output.py  test_40_color_formats.py  test_50_dual_gpu.py  test_60_logs.py  test_70_hotkeys.py
   results/<run>/  (gitignored)
 ```
 
