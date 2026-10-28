@@ -40,6 +40,9 @@ struct win_spout_filter {
 	bool is_active;
 	// holding a "showing" ref on the parent to keep it rendering off-screen
 	bool showing_held;
+
+	// Enable/Disable hotkeys, listed under the filter's name in Settings > Hotkeys (#54)
+	obs_hotkey_pair_id hotkeys;
 };
 
 // forward decls
@@ -264,6 +267,26 @@ void win_spout_filter_update(void *data, obs_data_t *settings)
 	obs_add_main_render_callback(win_spout_offscreen_render, context);
 }
 
+static bool win_spout_filter_hotkey_enable(void *data, obs_hotkey_pair_id, obs_hotkey_t *, bool pressed)
+{
+	struct win_spout_filter *context = (win_spout_filter *)data;
+	if (!pressed || obs_source_enabled(context->source_context)) {
+		return false;
+	}
+	obs_source_set_enabled(context->source_context, true);
+	return true;
+}
+
+static bool win_spout_filter_hotkey_disable(void *data, obs_hotkey_pair_id, obs_hotkey_t *, bool pressed)
+{
+	struct win_spout_filter *context = (win_spout_filter *)data;
+	if (!pressed || !obs_source_enabled(context->source_context)) {
+		return false;
+	}
+	obs_source_set_enabled(context->source_context, false);
+	return true;
+}
+
 void *win_spout_filter_create(obs_data_t *settings, obs_source_t *source)
 {
 	struct win_spout_filter *context = (win_spout_filter *)bzalloc(sizeof(win_spout_filter));
@@ -277,6 +300,7 @@ void *win_spout_filter_create(obs_data_t *settings, obs_source_t *source)
 	context->is_initialised = false;
 	context->is_active = false;
 	context->showing_held = false;
+	context->hotkeys = OBS_INVALID_HOTKEY_PAIR_ID;
 
 	pthread_mutex_init_value(&context->mutex);
 	if (pthread_mutex_init(&context->mutex, NULL) != 0) {
@@ -288,6 +312,13 @@ void *win_spout_filter_create(obs_data_t *settings, obs_source_t *source)
 	context->source_context = source;
 
 	context->filter_sender = new spoutDX;
+
+	// OBS saves and restores the bindings with the filter.
+	context->hotkeys = obs_hotkey_pair_register_source(source, "SpoutFilter.Enable",
+							   obs_module_text("hotkeyenablefilter"), "SpoutFilter.Disable",
+							   obs_module_text("hotkeydisablefilter"),
+							   win_spout_filter_hotkey_enable,
+							   win_spout_filter_hotkey_disable, context, context);
 
 	win_spout_filter_update(context, settings);
 
@@ -310,6 +341,9 @@ void win_spout_filter_destroy(void *data)
 	}
 
 	obs_remove_main_render_callback(win_spout_offscreen_render, context);
+
+	// Unregister before the context is freed so a key press can't reach it.
+	obs_hotkey_pair_unregister(context->hotkeys);
 
 	if (context->filter_sender) {
 		context->filter_sender->ReleaseSender();
