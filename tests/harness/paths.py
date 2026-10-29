@@ -70,6 +70,8 @@ WS_PORT = int(os.environ.get("OBS_TEST_WS_PORT", "4466"))
 WS_PASSWORD = os.environ.get("OBS_TEST_WS_PASSWORD", "obs-spout-test")
 
 SCENE_COLLECTION = "spout-test"
+SAVED_FILTER_COLLECTION = "spout-filter-saved"  # a colour source with a saved Spout Filter (#36)
+SAVED_FILTER_SENDER = "OBSTEST_Saved"
 SCENE_NAME = "Test"
 DEFAULT_PROFILE = "bgra"
 DEFAULT_VARIANT = "default"

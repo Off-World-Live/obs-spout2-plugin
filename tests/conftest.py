@@ -136,10 +136,12 @@ class ObsManager:
         self.launches = 0
         self.last_error: Optional[str] = None
 
-    def get(self, profile: str = paths.DEFAULT_PROFILE, variant: Optional[str] = None, fresh: bool = False) -> ObsClient:
+    def get(self, profile: str = paths.DEFAULT_PROFILE, variant: Optional[str] = None, fresh: bool = False,
+            collection: str = paths.SCENE_COLLECTION) -> ObsClient:
         variant = variant or self.default_variant
         cur = self.current
-        if cur is not None and not fresh and cur.profile == profile and cur.variant == variant and cur.alive() and self.client is not None:
+        if (cur is not None and not fresh and cur.profile == profile and cur.variant == variant and cur.collection == collection
+                and cur.alive() and self.client is not None):
             try:
                 self.client.version()
                 return self.client
@@ -148,7 +150,7 @@ class ObsManager:
         self.stop()
         kill_stale_test_obs()
         self.launches += 1
-        proc = ObsProcess(profile, variant, self.run_dir, label=f"{self.launches:02d}")
+        proc = ObsProcess(profile, variant, self.run_dir, label=f"{self.launches:02d}", collection=collection)
         try:
             proc.launch()
             self.client = proc.wait_ready()
@@ -164,7 +166,8 @@ class ObsManager:
         cur = self.current
         profile = cur.profile if cur else paths.DEFAULT_PROFILE
         variant = cur.variant if cur else self.default_variant
-        return self.get(profile, variant, fresh=True)
+        collection = cur.collection if cur else paths.SCENE_COLLECTION
+        return self.get(profile, variant, fresh=True, collection=collection)
 
     def stop(self) -> Optional[Path]:
         cur = self.current

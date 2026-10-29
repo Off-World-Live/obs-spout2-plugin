@@ -250,6 +250,7 @@ class ObsProcess:
     variant: str
     run_dir: Path
     label: str = ""
+    collection: str = paths.SCENE_COLLECTION
     proc: Optional[subprocess.Popen] = field(default=None, repr=False)
     log_path: Optional[Path] = None
     client: Optional[ObsClient] = None
@@ -275,7 +276,7 @@ class ObsProcess:
         paths.OBS_SENTINEL.unlink(missing_ok=True)
         paths.OBS_LOG_DIR.mkdir(parents=True, exist_ok=True)
         self._logs_before = list(paths.OBS_LOG_DIR.glob("*.txt"))
-        args = [str(paths.OBS_EXE), *OBS_ARGS, "--collection", paths.SCENE_COLLECTION, "--profile", self.profile,
+        args = [str(paths.OBS_EXE), *OBS_ARGS, "--collection", self.collection, "--profile", self.profile,
                 "--scene", paths.SCENE_NAME, "--websocket_port", str(paths.WS_PORT), "--websocket_password", paths.WS_PASSWORD]
         self.started_at = time.monotonic()
         self.proc = subprocess.Popen(args, cwd=str(paths.OBS_BIN_DIR), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
